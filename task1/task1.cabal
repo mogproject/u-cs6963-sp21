@@ -1,0 +1,61 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.3.
+--
+-- see: https://github.com/sol/hpack
+
+name:           task1
+version:        0.0.1
+author:         Yosuke Mizutani <yos@cs.utah.edu>
+maintainer:     Yosuke Mizutani <yos@cs.utah.edu>
+copyright:      (c) 2021 Yosuke Mizutani
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      BitSet
+      Sudoku
+  other-modules:
+      Paths_task1
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  build-depends:
+      base ==4.*
+    , containers
+  default-language: Haskell2010
+
+executable generate
+  main-is: src/generate.hs
+  ghc-options: -Wall
+  build-depends:
+      base
+    , containers
+    , task1
+  default-language: Haskell2010
+
+executable solve
+  main-is: src/solve.hs
+  ghc-options: -Wall
+  build-depends:
+      base
+    , containers
+    , task1
+  default-language: Haskell2010
+
+test-suite task1-spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      SudokuSpec
+  hs-source-dirs:
+      test
+  ghc-options: -Wall
+  build-depends:
+      base ==4.*
+    , containers
+    , hspec
+    , task1
+  default-language: Haskell2010
+  build-tool-depends: hspec-discover:hspec-discover == 2.*

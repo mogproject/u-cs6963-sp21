@@ -1,0 +1,8 @@
+cradle:
+  stack:
+    - path: "./src/"
+      component: "task1:exe:solve"
+    - path: "./src/"
+      component: "task1:exe:generate"
+    - path: "./test/"
+      component: "task1:test:task1-spec"
