@@ -1,12 +1,11 @@
-module Sudoku (readSudoku, solveSudoku, emptySudoku, Sudoku) where
+module Data.Sudoku (Sudoku, readSudoku, emptySudoku, insert, getEmptyPositions, getAvailableNumbers) where
 
-import BitSet (BitSet, complement, delete, empty, intersection, notMember, toList)
 import Control.Monad (foldM)
+import Data.BitSet (BitSet, complement, delete, empty, intersection, notMember, toList)
 import Data.Char (isSpace)
 import Data.List (dropWhileEnd)
 import Data.Map (Map, (!))
 import qualified Data.Map
-import Data.Maybe (listToMaybe, maybeToList)
 import Text.Read (readEither)
 
 --------------------------------------------------------------------------------
@@ -59,7 +58,7 @@ emptySudoku n m = Sudoku nn mm (Data.Map.empty, initConstraints, initConstraints
     nn = max 1 n
     mm = max 1 m
     -- initially, all numbers are available
-    initConstraints = Data.Map.fromList [(i, complement (BitSet.empty $ nn * mm)) | i <- [0 .. nn * mm - 1]]
+    initConstraints = Data.Map.fromList [(i, complement (Data.BitSet.empty $ nn * mm)) | i <- [0 .. nn * mm - 1]]
 
 --------------------------------------------------------------------------------
 -- I/O
@@ -122,7 +121,7 @@ readSudoku text = case (filter (not . null) . map trim . lines) text of
       Left _ -> Left $ "parse error: " ++ s
 
     updateBoard :: Sudoku -> (Pos, Entry) -> Either String Sudoku
-    updateBoard sd (p, v) = case Sudoku.insert sd p v of
+    updateBoard sd (p, v) = case insert sd p v of
       Just s -> Right s
       Nothing -> Left "invalid board"
 
@@ -139,6 +138,10 @@ getRegionId :: Sudoku -> RowId -> ColumnId -> RegionId
 getRegionId (Sudoku n m _) r c | all (isValidNum n m) [r, c] = r `div` n * n + c `div` m
 getRegionId _ _ _ = undefined
 
+--------------------------------------------------------------------------------
+-- Operations
+--------------------------------------------------------------------------------
+
 -- | Inserts one entry to the given Sudoku instance.
 insert :: Sudoku -> Pos -> Entry -> Maybe Sudoku
 insert sd@(Sudoku n m (b, rows, cols, regs)) pos@(r, c) v
@@ -149,18 +152,10 @@ insert sd@(Sudoku n m (b, rows, cols, regs)) pos@(r, c) v
           else Just $ Sudoku n m (Data.Map.insert pos v b, Data.Map.adjust (delete v) r rows, Data.Map.adjust (delete v) c cols, Data.Map.adjust (delete v) rid regs)
 insert _ _ _ = Nothing
 
---------------------------------------------------------------------------------
--- Solver
---------------------------------------------------------------------------------
+-- | Returns a list of empty positions.
+getEmptyPositions :: Sudoku -> [Pos]
+getEmptyPositions (Sudoku n m (b, _, _, _)) = [(r, c) | r <- [0 .. n * m - 1], c <- [0 .. n * m - 1], (r, c) `Data.Map.notMember` b]
 
--- | Solves a Sudoku instance recursively.
-solveSudoku :: Sudoku -> [Sudoku]
-solveSudoku sd@(Sudoku n m (board, rows, cols, regs)) =
-  -- find an empty grid on the board
-  let target = listToMaybe [(r, c) | r <- [0 .. n * m - 1], c <- [0 .. n * m - 1], (r, c) `Data.Map.notMember` board]
-   in case target of
-        Just pos@(r, c) ->
-          let candidates = foldl1 BitSet.intersection [rows ! r, cols ! c, regs ! getRegionId sd r c]
-              solutions = BitSet.toList candidates >>= (maybeToList . Sudoku.insert sd pos) >>= solveSudoku
-           in solutions
-        Nothing -> [sd] -- completed
+-- | Returns a list of available numbers at the given position.
+getAvailableNumbers :: Sudoku -> Pos -> [Int]
+getAvailableNumbers sd@(Sudoku _ _ (_, rows, cols, regs)) (r, c) = toList $ foldl1 intersection [rows ! r, cols ! c, regs ! getRegionId sd r c]

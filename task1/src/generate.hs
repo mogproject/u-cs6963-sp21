@@ -1,4 +1,5 @@
-import Sudoku (Sudoku, emptySudoku, solveSudoku)
+import Algorithm.SudokuSolver (solveSudoku)
+import Data.Sudoku (Sudoku, emptySudoku)
 import System.Environment (getArgs, getProgName)
 import Text.Read (readMaybe)
 

@@ -1,8 +1,8 @@
-module BitSet
+module Data.BitSet
   ( BitSet,
-    BitSet.empty,
-    BitSet.null,
-    BitSet.complement,
+    Data.BitSet.empty,
+    Data.BitSet.null,
+    Data.BitSet.complement,
     member,
     notMember,
     insert,

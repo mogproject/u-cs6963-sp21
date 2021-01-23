@@ -1,6 +1,6 @@
-module SudokuSpec (spec) where
+module Data.SudokuSpec (spec) where
 
-import Sudoku
+import Data.Sudoku
 import Test.Hspec
 
 spec :: Spec

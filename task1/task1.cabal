@@ -14,8 +14,9 @@ build-type:     Simple
 
 library
   exposed-modules:
-      BitSet
-      Sudoku
+      Algorithm.SudokuSolver
+      Data.BitSet
+      Data.Sudoku
   other-modules:
       Paths_task1
   hs-source-dirs:
@@ -48,7 +49,7 @@ test-suite task1-spec
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      SudokuSpec
+      Data.SudokuSpec
   hs-source-dirs:
       test
   ghc-options: -Wall

@@ -1,5 +1,6 @@
+import Algorithm.SudokuSolver (solveSudoku)
 import Control.Monad ((>=>))
-import Sudoku (Sudoku, readSudoku, solveSudoku)
+import Data.Sudoku (Sudoku, readSudoku)
 
 main :: IO ()
 main = interact $ either (++ "\n") show . (readSudoku >=> solve)
