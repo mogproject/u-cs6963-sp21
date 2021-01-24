@@ -1,4 +1,15 @@
-module Data.Sudoku (Sudoku, readSudoku, emptySudoku, insert, getEmptyPositions, getAvailableNumbers) where
+module Data.Sudoku
+  ( Sudoku,
+    Pos,
+    ExtendedPos,
+    readSudoku,
+    emptySudoku,
+    insert,
+    getEmptyPositions,
+    getAvailableNumbers,
+    getRegionId,
+  )
+where
 
 import Control.Monad (foldM)
 import Data.BitSet (BitSet, complement, delete, empty, intersection, notMember, toList)
@@ -30,6 +41,9 @@ type RegionId = Int
 -- | Position of a grid on the board.
 type Pos = (RowId, ColumnId)
 
+-- | Position plus region ID.
+type ExtendedPos = (RowId, ColumnId, RegionId)
+
 -- | Internal representation of grid values (0-indexed).
 type Entry = Int
 
@@ -49,7 +63,7 @@ data Sudoku
       -- ^ m: Width of each region
       BoardInfo
       -- ^ Board information
-  deriving (Eq)
+  deriving (Ord, Eq)
 
 -- | Creates an empty sudoku board.
 emptySudoku :: RegionHeight -> RegionWidth -> Sudoku

@@ -10,6 +10,7 @@ ghc-options: -Wall
 dependencies:
   - base == 4.*
   - containers
+  - random
 
 library:
   source-dirs: src

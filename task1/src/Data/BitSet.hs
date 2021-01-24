@@ -27,6 +27,23 @@ instance Eq BitSet where
     let u = (1 `shift` n) - 1
      in n == m && (a .&. u) == (b .&. u)
 
+-- | Determines ordering of bitsets.
+instance Ord BitSet where
+  (BitSet n a) `compare` (BitSet m b) =
+    let u = (1 `shift` n) - 1
+     in if n < m
+          then LT
+          else
+            if n > m
+              then GT
+              else
+                if (a .&. u) < (b .&. u)
+                  then LT
+                  else
+                    if (a .&. u) > (b .&. u)
+                      then GT
+                      else EQ
+
 -- | Represents the value as a binary string of length n.
 instance Show BitSet where
   show bs@(BitSet n _) = concatMap (\x -> if x `member` bs then "1" else "0") [n -1, n -2 .. 0]

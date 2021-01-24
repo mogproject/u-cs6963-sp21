@@ -26,6 +26,6 @@ usage p =
     ]
 
 generate :: (Int, Int, Int) -> Either String Sudoku
-generate (n, m, _) = case solveSudoku $ emptySudoku n m of
+generate (n, m, seed) = case solveSudoku seed (emptySudoku n m) of
   x : _ -> Right x
   _ -> Left "failed to generate a sudoku instance"
