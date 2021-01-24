@@ -3,18 +3,21 @@ import Data.Sudoku (Sudoku, emptySudoku)
 import System.Environment (getArgs, getProgName)
 import Text.Read (readMaybe)
 
+-- | Entry point of the program.
 main :: IO ()
 main = do
   prog <- getProgName
   args <- getArgs
   putStr $ either id show $ maybe (Left (usage prog)) Right (parseArgs args) >>= generate
 
+-- | Parses command-line arguments.
 parseArgs :: [String] -> Maybe (Int, Int, Int)
 parseArgs args = case mapM readMaybe args of
   Just [n, m, seed] | n > 0 && m > 0 -> Just (n, m, seed)
   Just [n, m] | n > 0 && m > 0 -> Just (n, m, 0)
   _ -> Nothing
 
+-- | Command-line usage.
 usage :: String -> String
 usage p =
   unlines
@@ -25,6 +28,7 @@ usage p =
       "  seed         : seed of the pseudo random number generator (default:0)"
     ]
 
+-- | Generates a Sudoku instance.
 generate :: (Int, Int, Int) -> Either String Sudoku
 generate (n, m, seed) = case solveSudoku seed (emptySudoku n m) of
   x : _ -> Right x

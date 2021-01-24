@@ -14,7 +14,7 @@ where
 import Control.Monad (foldM)
 import Data.BitSet (BitSet, complement, delete, empty, intersection, notMember, toList)
 import Data.Char (isSpace)
-import Data.List (dropWhileEnd)
+import Data.List (dropWhileEnd, isPrefixOf)
 import Data.Map (Map, (!))
 import qualified Data.Map
 import Text.Read (readEither)
@@ -48,21 +48,19 @@ type ExtendedPos = (RowId, ColumnId, RegionId)
 type Entry = Int
 
 -- | Board information
--- | - board representation; map from positions to entries
--- | - row constraints; available numbers for each row
--- | - column constraints; available numbers for each column
--- | - region constraints; available numbers for each region
-type BoardInfo = (Map Pos Entry, Map RowId BitSet, Map ColumnId BitSet, Map RegionId BitSet)
+type BoardInfo =
+  ( Map Pos Entry, -- board representation; map from positions to entries
+    Map RowId BitSet, -- row constraints; available numbers for each row
+    Map ColumnId BitSet, -- column constraints; available numbers for each column
+    Map RegionId BitSet -- region constraints; available numbers for each region
+  )
 
 -- | Representation of a sudoku board and pre-computed availability
 data Sudoku
   = Sudoku
-      RegionHeight
-      -- ^ n: Height of each region
-      RegionWidth
-      -- ^ m: Width of each region
-      BoardInfo
-      -- ^ Board information
+      RegionHeight -- n: Height of each region
+      RegionWidth -- m: Width of each region
+      BoardInfo -- Board information
   deriving (Ord, Eq)
 
 -- | Creates an empty sudoku board.
@@ -89,7 +87,7 @@ instance Show Sudoku where
 
 -- | Creates a sudoku board from the given string.
 readSudoku :: String -> Either String Sudoku
-readSudoku text = case (filter (not . null) . map trim . lines) text of
+readSudoku text = case (filter (not . isPrefixOf "#") . filter (not . null) . map trim . lines) text of
   x : xs ->
     do
       (n, m) <- readDimensions x

@@ -40,6 +40,7 @@ spec = do
       (readSudoku "1 1\n.\n\n" >>= Right . show) `shouldBe` Right "1 1\n.\n"
       (readSudoku "1 1\n.\n \n" >>= Right . show) `shouldBe` Right "1 1\n.\n"
       (readSudoku "1 1\n1" >>= Right . show) `shouldBe` Right "1 1\n1\n"
+      (readSudoku "#comment\n1 1\n #comment\n\n1" >>= Right . show) `shouldBe` Right "1 1\n1\n"
       (readSudoku "2 2\n. . . .\n. . . .\n. . . .\n. . . ." >>= Right . show) `shouldBe` Right "2 2\n. . . .\n. . . .\n. . . .\n. . . .\n"
       (readSudoku "2 2\n1 2 . .\n. . . .\n. . . .\n. . . ." >>= Right . show) `shouldBe` Right "2 2\n1 2 . .\n. . . .\n. . . .\n. . . .\n"
       (readSudoku "2 2\n1 2 3 4\n3 4 1 2\n2 1 4 3\n4 3 2 1" >>= Right . show) `shouldBe` Right "2 2\n1 2 3 4\n3 4 1 2\n2 1 4 3\n4 3 2 1\n"

@@ -3,8 +3,8 @@ module Algorithm.SudokuSolver (solveSudoku) where
 import Data.Maybe (maybeToList)
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Sudoku (ExtendedPos, Pos, Sudoku, getAvailableNumbers, getEmptyPositions, getRegionId, insert)
-import System.Random (Random (randomR), mkStdGen)
+import Data.Sudoku (Pos, Sudoku, getAvailableNumbers, getEmptyPositions, insert)
+import System.Random (StdGen, mkStdGen, randomR)
 
 --------------------------------------------------------------------------------
 -- Sudoku solver
@@ -12,10 +12,14 @@ import System.Random (Random (randomR), mkStdGen)
 
 -- | Solves a Sudoku instance recursively.
 solveSudoku :: Int -> Sudoku -> [Sudoku]
-solveSudoku seed sd = solveSudoku' (Set.fromList (getEmptyPositions sd)) sd
+solveSudoku seed sd = solveSudoku' (mkStdGen seed) (Set.fromList (getEmptyPositions sd)) sd
 
-solveSudoku' :: Set Pos -> Sudoku -> [Sudoku]
-solveSudoku' ps sd =
+solveSudoku' :: StdGen -> Set Pos -> Sudoku -> [Sudoku]
+solveSudoku'
+  rnd  -- pseudo random number generator
+  ps -- set of empty grids
+  sd -- partially filled Sudoku instance
+  =
   if null ps
     then do
       [sd] -- completed
@@ -29,5 +33,9 @@ solveSudoku' ps sd =
           [] -- no solution
         else do
           let candidates = [(p, xs) | (p, len, xs) <- positions, len == minLength]
-          let (p, xs) = head candidates
-          xs >>= (maybeToList . insert sd p) >>= solveSudoku' (p `Set.delete` ps)
+
+          -- tie breaking by a pseudo random number
+          let (i, gen) = randomR (0, length candidates - 1) rnd
+          let (p, xs) = candidates !! i
+
+          xs >>= (maybeToList . insert sd p) >>= solveSudoku' gen (p `Set.delete` ps)
