@@ -1,0 +1,29 @@
+name: santorini
+version: 0.0.1
+license: Apache-2.0
+copyright: (c) 2021 Yosuke Mizutani
+author: Yosuke Mizutani <yos@cs.utah.edu>
+maintainer: Yosuke Mizutani <yos@cs.utah.edu>
+
+ghc-options: -Wall
+
+dependencies:
+  - base == 4.*
+  - containers
+  - random
+  - json
+
+library:
+  source-dirs: src
+
+executables:
+  sentorini-player:
+    main: src/player.hs
+    dependencies: []
+
+tests:
+  task1-spec:
+    main: Spec.hs
+    source-dirs: test
+    defaults: hspec/hspec@master
+    dependencies: [hspec]
