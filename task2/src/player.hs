@@ -1,4 +1,10 @@
+import Data.Aeson (decode)
+-- import Data.String.Conversions (cs)
+
+import Data.Board (readBoard, readPlayers)
+import Data.List
 import System.Environment (getArgs, getProgName)
+import System.IO
 import Text.Read (readMaybe)
 
 -- | Entry point of the program.
@@ -6,9 +12,8 @@ main :: IO ()
 main = do
   prog <- getProgName
   args <- getArgs
-  case parseArgs args of
-    Just seed -> print seed
-    Nothing -> putStr $ usage prog
+  hSetBuffering stdout LineBuffering -- make sure to flush each line
+  interact $ unlines . map processLine . zip [0 ..] . lines
 
 -- | Parses command-line arguments.
 parseArgs :: [String] -> Maybe Int
@@ -25,3 +30,11 @@ usage p =
       "",
       "  seed : seed of the pseudo random number generator (default:0)"
     ]
+
+processLine :: (Int, String) -> String
+processLine (lineNo, line) = case lineNo of
+  0 -> case readPlayers line of
+    Just [] -> "I'm Player 1"
+    Just [p] -> "I'm Player 2"
+    _ -> "unexpected input"
+  _ -> (show . readBoard) line

@@ -13,43 +13,54 @@ license:        Apache-2.0
 build-type:     Simple
 
 library
+  exposed-modules:
+      Data.Board
+      Data.Message
+      Search.Initial
+      Search.Search
   other-modules:
       Paths_santorini
   hs-source-dirs:
       src
   ghc-options: -Wall
   build-depends:
-      base ==4.*
+      aeson
+    , base ==4.*
     , containers
-    , json
     , random
+    , string-conversions
   default-language: Haskell2010
 
-executable sentorini-player
+executable santorini-player
   main-is: src/player.hs
   other-modules:
       Paths_santorini
   ghc-options: -Wall
   build-depends:
-      base ==4.*
+      aeson
+    , base ==4.*
     , containers
-    , json
     , random
+    , santorini
+    , string-conversions
   default-language: Haskell2010
 
 test-suite task1-spec
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Data.BoardSpec
       Paths_santorini
   hs-source-dirs:
       test
   ghc-options: -Wall
   build-depends:
-      base ==4.*
+      aeson
+    , base ==4.*
     , containers
     , hspec
-    , json
     , random
+    , santorini
+    , string-conversions
   default-language: Haskell2010
   build-tool-depends: hspec-discover:hspec-discover == 2.*

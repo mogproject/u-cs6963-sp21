@@ -11,19 +11,20 @@ dependencies:
   - base == 4.*
   - containers
   - random
-  - json
+  - aeson
+  - string-conversions
 
 library:
   source-dirs: src
 
 executables:
-  sentorini-player:
+  santorini-player:
     main: src/player.hs
-    dependencies: []
+    dependencies: [santorini]
 
 tests:
   task1-spec:
     main: Spec.hs
     source-dirs: test
     defaults: hspec/hspec@master
-    dependencies: [hspec]
+    dependencies: [santorini, hspec]
