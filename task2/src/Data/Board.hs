@@ -23,7 +23,7 @@ import GHC.Generics
 -- dimension
 type Dim = Int
 
-type Height = Int
+type Level = Int
 
 type Pos = (Dim, Dim)
 
@@ -33,7 +33,7 @@ type Players = [Workers]
 
 data Board = Board
   { players :: Players,
-    spaces :: [[Height]],
+    spaces :: [[Level]],
     turn :: Int
   }
   deriving (Show, Eq)
@@ -57,16 +57,16 @@ isValidPos (x, y) = all isValidDim [x, y]
 isUniquePos :: [Pos] -> Bool
 isUniquePos ps = (== length ps) . length . nub $ ps
 
-isValidHeight :: Height -> Bool
-isValidHeight h = 0 <= h && h <= 4
+isValidLevel :: Level -> Bool
+isValidLevel h = 0 <= h && h <= 4
 
 isValidPlayers :: Bool -> Players -> Bool
 isValidPlayers isStrict ws =
   let ps = concat [[w1, w2] | (w1, w2) <- ws]
    in ((if isStrict then (==) else (>=)) 2 . length) ws && all isValidPos ps && isUniquePos ps
 
-isValidSpaces :: [[Height]] -> Bool
-isValidSpaces sp = length sp == 5 && all (\r -> length r == 5 && all isValidHeight r) sp
+isValidSpaces :: [[Level]] -> Bool
+isValidSpaces sp = length sp == 5 && all (\r -> length r == 5 && all isValidLevel r) sp
 
 isValidBoard :: Board -> Bool
 isValidBoard b = isValidPlayers True (players b) && isValidSpaces (spaces b) && (turn b) >= 0
