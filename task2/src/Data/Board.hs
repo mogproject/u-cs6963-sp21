@@ -76,7 +76,7 @@ isValidSpaces :: [[Height]] -> Bool
 isValidSpaces sp = length sp == 5 && all (\r -> length r == 5 && all isValidHeight r) sp
 
 isValidBoard :: Board -> Bool
-isValidBoard b = isValidPlayers True (players b) && isValidSpaces (spaces b) && (turn b) >= 1
+isValidBoard b = isValidPlayers True (players b) && isValidSpaces (spaces b) && (turn b) >= 0
 
 --------------------------------------------------------------------------------
 -- I/O
