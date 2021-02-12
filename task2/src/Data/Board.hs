@@ -2,9 +2,6 @@
 
 module Data.Board
   ( Pos,
-    Row,
-    Column,
-    Height,
     Workers,
     Players,
     Board (Board),
@@ -23,13 +20,12 @@ import Data.List
 import Data.String.Conversions (cs)
 import GHC.Generics
 
-type Row = Int
-
-type Column = Int
+-- dimension
+type Dim = Int
 
 type Height = Int
 
-type Pos = (Row, Column)
+type Pos = (Dim, Dim)
 
 type Workers = (Pos, Pos)
 
@@ -52,14 +48,11 @@ instance ToJSON Board where
 -- Validation
 --------------------------------------------------------------------------------
 
-isValidRow :: Row -> Bool
-isValidRow x = 1 <= x && x <= 5
-
-isValidColumn :: Column -> Bool
-isValidColumn y = 1 <= y && y <= 5
+isValidDim :: Dim -> Bool
+isValidDim x = 1 <= x && x <= 5
 
 isValidPos :: Pos -> Bool
-isValidPos (x, y) = isValidRow x && isValidColumn y
+isValidPos (x, y) = all isValidDim [x, y]
 
 isUniquePos :: [Pos] -> Bool
 isUniquePos ps = (== length ps) . length . nub $ ps
