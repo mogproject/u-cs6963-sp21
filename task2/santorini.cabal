@@ -16,6 +16,7 @@ library
   exposed-modules:
       Data.Board
       Data.Message
+      Game.GameState
       Search.Initial
       Search.Search
   other-modules:
