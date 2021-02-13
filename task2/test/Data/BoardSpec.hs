@@ -2,16 +2,75 @@ module Data.BoardSpec (spec) where
 
 import Data.Board
   ( Board (Board),
+    Players,
+    Pos,
     players,
     readBoard,
     readPlayers,
     spaces,
     turn,
+    writeBoard,
+    writePlayers,
   )
+import Data.List (nub)
+import Data.List.Split
 import Test.Hspec
+import Test.Hspec.QuickCheck
+import Test.QuickCheck
+
+newtype PlayersT = PlayersT {playersData :: Players} deriving (Show)
+
+instance Arbitrary PlayersT where
+  arbitrary = do
+    numPlayers <- chooseInt (0, 2)
+    positions <- choosePositions (numPlayers * 2)
+    return $ createPlayers positions
+    where
+      choosePos :: Gen Pos
+      choosePos = do
+        x <- chooseInt (1, 5)
+        y <- chooseInt (1, 5)
+        return (x, y)
+      choosePositions :: Int -> Gen [Pos]
+      choosePositions k = do
+        ls <- infiniteListOf choosePos
+        return $ (take k . nub) ls
+      createPlayers :: [Pos] -> PlayersT
+      createPlayers ps = PlayersT [(w, u) | [w, u] <- chunksOf 2 ps]
 
 spec :: Spec
 spec = do
+  describe "Board#readPlayers()" $ do
+    it "fails with invalid input" $ do
+      readPlayers "" `shouldBe` Nothing
+      readPlayers "[" `shouldBe` Nothing
+      readPlayers "[[[1,2],[True,3]]]" `shouldBe` Nothing
+      readPlayers "[[[1,2],[0,3]]]" `shouldBe` Nothing
+      readPlayers "[[[1,2],[1,6]]]" `shouldBe` Nothing
+      readPlayers "[[[1,2],[1,2]]]" `shouldBe` Nothing
+      readPlayers "[[[1,2],[1,3,2]]]" `shouldBe` Nothing
+      readPlayers "[[[1,2],[1]]]" `shouldBe` Nothing
+      readPlayers "[[[1,2],[1,3],[2,3]]]" `shouldBe` Nothing
+      readPlayers "[[[1,2],[1,3]],[[1,4],[1,2]]]" `shouldBe` Nothing
+      readPlayers "[[[1,2],[1,3]],[[2,1],[4,3]],[[2,2],[3,3]]]" `shouldBe` Nothing
+
+    it "succeeds with valid input" $ do
+      readPlayers "[]" `shouldBe` Just []
+      readPlayers "[[[1,2],[3,4]]]" `shouldBe` Just [((1, 2), (3, 4))]
+      readPlayers "[[[1,2],[3,4]],[[2,1],[4,3]]]" `shouldBe` Just [((1, 2), (3, 4)), ((2, 1), (4, 3))]
+      readPlayers "  [ [  [ 1 , 2],[3 , 4 ] \n],\n[  [2,1 ],[ 4, 3 ] ] ]  " `shouldBe` Just [((1, 2), (3, 4)), ((2, 1), (4, 3))]
+
+  describe "Board#writePlayers()" $ do
+    it "returns JSON string" $ do
+      writePlayers [] `shouldBe` "[]"
+      writePlayers [((1, 2), (3, 4))] `shouldBe` "[[[1,2],[3,4]]]"
+      writePlayers [((1, 2), (3, 4)), ((2, 1), (4, 3))] `shouldBe` "[[[1,2],[3,4]],[[2,1],[4,3]]]"
+
+  describe "Board#readPlayers()" $ do
+    prop "is inverse to writePlayers()" $ \t ->
+      let p = playersData t
+       in (readPlayers . writePlayers) p `shouldBe` Just p
+
   describe "Board#readBoard()" $ do
     it "fails with invalid input" $ do
       readBoard "" `shouldBe` Nothing
@@ -84,22 +143,19 @@ spec = do
               turn = 0
             }
 
-  describe "Board#readPlayers()" $ do
-    it "fails with invalid input" $ do
-      readPlayers "" `shouldBe` Nothing
-      readPlayers "[" `shouldBe` Nothing
-      readPlayers "[[[1,2],[True,3]]]" `shouldBe` Nothing
-      readPlayers "[[[1,2],[0,3]]]" `shouldBe` Nothing
-      readPlayers "[[[1,2],[1,6]]]" `shouldBe` Nothing
-      readPlayers "[[[1,2],[1,2]]]" `shouldBe` Nothing
-      readPlayers "[[[1,2],[1,3,2]]]" `shouldBe` Nothing
-      readPlayers "[[[1,2],[1]]]" `shouldBe` Nothing
-      readPlayers "[[[1,2],[1,3],[2,3]]]" `shouldBe` Nothing
-      readPlayers "[[[1,2],[1,3]],[[1,4],[1,2]]]" `shouldBe` Nothing
-      readPlayers "[[[1,2],[1,3]],[[2,1],[4,3]],[[2,2],[3,3]]]" `shouldBe` Nothing
-
-    it "succeeds with valid input" $ do
-      readPlayers "[]" `shouldBe` Just []
-      readPlayers "[[[1,2],[3,4]]]" `shouldBe` Just [((1, 2), (3, 4))]
-      readPlayers "[[[1,2],[3,4]],[[2,1],[4,3]]]" `shouldBe` Just [((1, 2), (3, 4)), ((2, 1), (4, 3))]
-      readPlayers "  [ [  [ 1 , 2],[3 , 4 ] \n],\n[  [2,1 ],[ 4, 3 ] ] ]  " `shouldBe` Just [((1, 2), (3, 4)), ((2, 1), (4, 3))]
+  describe "Board#writeBoard()" $ do
+    it "returns JSON string" $ do
+      let b1 =
+            Board
+              { players = [((2, 3), (4, 4)), ((2, 5), (3, 5))],
+                spaces = [[0, 0, 0, 0, 2], [1, 1, 2, 0, 0], [1, 0, 0, 3, 0], [0, 0, 3, 0, 0], [0, 0, 0, 1, 4]],
+                turn = 18
+              }
+      let b2 =
+            Board
+              { players = [((5, 5), (4, 4)), ((3, 3), (2, 2))],
+                spaces = [[0, 1, 2, 3, 4], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4]],
+                turn = 0
+              }
+      writeBoard b1 `shouldBe` "{\"turn\":18,\"spaces\":[[0,0,0,0,2],[1,1,2,0,0],[1,0,0,3,0],[0,0,3,0,0],[0,0,0,1,4]],\"players\":[[[2,3],[4,4]],[[2,5],[3,5]]]}"
+      writeBoard b2 `shouldBe` "{\"turn\":0,\"spaces\":[[0,1,2,3,4],[0,1,2,3,4],[0,1,2,3,4],[0,1,2,3,4],[0,1,2,3,4]],\"players\":[[[5,5],[4,4]],[[3,3],[2,2]]]}"

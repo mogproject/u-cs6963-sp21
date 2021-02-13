@@ -13,6 +13,7 @@ dependencies:
   - random
   - aeson
   - string-conversions
+  - split
 
 library:
   source-dirs: src
@@ -23,8 +24,8 @@ executables:
     dependencies: [santorini]
 
 tests:
-  task1-spec:
+  spec:
     main: Spec.hs
     source-dirs: test
     defaults: hspec/hspec@master
-    dependencies: [santorini, hspec]
+    dependencies: [santorini, hspec, QuickCheck]

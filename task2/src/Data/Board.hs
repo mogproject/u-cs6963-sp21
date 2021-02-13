@@ -10,11 +10,13 @@ module Data.Board
     turn,
     readPlayers,
     readBoard,
+    writePlayers,
+    writeBoard,
   )
 where
 
 import Control.Monad (foldM, mapM, mfilter)
-import Data.Aeson (FromJSON, ToJSON, decode)
+import Data.Aeson (FromJSON, ToJSON, decode, encode)
 import Data.Aeson.Types
 import Data.List
 import Data.String.Conversions (cs)
@@ -69,14 +71,20 @@ isValidSpaces :: [[Level]] -> Bool
 isValidSpaces sp = length sp == 5 && all (\r -> length r == 5 && all isValidLevel r) sp
 
 isValidBoard :: Board -> Bool
-isValidBoard b = isValidPlayers True (players b) && isValidSpaces (spaces b) && (turn b) >= 0
+isValidBoard b = isValidPlayers True (players b) && isValidSpaces (spaces b) && turn b >= 0
 
 --------------------------------------------------------------------------------
 -- I/O
 --------------------------------------------------------------------------------
 
 readPlayers :: String -> Maybe [Workers]
-readPlayers = (mfilter $ isValidPlayers False) . decode . cs
+readPlayers = mfilter (isValidPlayers False) . decode . cs
 
 readBoard :: String -> Maybe Board
-readBoard = (mfilter isValidBoard) . decode . cs
+readBoard = mfilter isValidBoard . decode . cs
+
+writePlayers :: [Workers] -> String
+writePlayers = cs . encode
+
+writeBoard :: Board -> String
+writeBoard = cs . encode
