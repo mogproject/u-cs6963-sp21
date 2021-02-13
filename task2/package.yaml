@@ -14,6 +14,7 @@ dependencies:
   - aeson
   - string-conversions
   - split
+  - QuickCheck
 
 library:
   source-dirs: src
@@ -28,4 +29,4 @@ tests:
     main: Spec.hs
     source-dirs: test
     defaults: hspec/hspec@master
-    dependencies: [santorini, hspec, QuickCheck]
+    dependencies: [santorini, hspec]

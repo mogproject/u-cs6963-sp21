@@ -24,7 +24,8 @@ library
       src
   ghc-options: -Wall
   build-depends:
-      aeson
+      QuickCheck
+    , aeson
     , base ==4.*
     , containers
     , random
@@ -38,7 +39,8 @@ executable santorini-player
       Paths_santorini
   ghc-options: -Wall
   build-depends:
-      aeson
+      QuickCheck
+    , aeson
     , base ==4.*
     , containers
     , random

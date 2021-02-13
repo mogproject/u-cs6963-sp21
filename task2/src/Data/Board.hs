@@ -5,6 +5,7 @@ module Data.Board
     Workers,
     Players,
     Board (Board),
+    Level,
     players,
     spaces,
     turn,
@@ -12,15 +13,17 @@ module Data.Board
     readBoard,
     writePlayers,
     writeBoard,
+    choosePlayers,
   )
 where
 
-import Control.Monad (foldM, mapM, mfilter)
-import Data.Aeson (FromJSON, ToJSON, decode, encode)
+import Control.Monad (mfilter)
+import Data.Aeson (decode, encode)
 import Data.Aeson.Types
-import Data.List
 import Data.String.Conversions (cs)
-import GHC.Generics
+import Test.QuickCheck
+import Data.List (nub)
+import Data.List.Split
 
 -- dimension
 type Dim = Int
@@ -88,3 +91,31 @@ writePlayers = cs . encode
 
 writeBoard :: Board -> String
 writeBoard = cs . encode
+
+--------------------------------------------------------------------------------
+-- Gen for property-based testing
+--------------------------------------------------------------------------------
+
+choosePlayers :: Int -> Gen Players
+choosePlayers numPlayers = do
+  positions <- choosePositions (numPlayers * 2)
+  return $ createPlayers positions
+  where
+    choosePos :: Gen Pos
+    choosePos = do
+      x <- chooseInt (1, 5)
+      y <- chooseInt (1, 5)
+      return (x, y)
+    choosePositions :: Int -> Gen [Pos]
+    choosePositions k = do
+      ls <- infiniteListOf choosePos
+      return $ (take k . nub) ls
+    createPlayers :: [Pos] -> Players
+    createPlayers ps = [(w, u) | [w, u] <- chunksOf 2 ps]
+
+instance Arbitrary Board where
+  arbitrary = do
+    p <- choosePlayers 2 -- possible that a worker is at level 4
+    lv <- vectorOf 25 (chooseInt (0, 4)) -- not consistent with the turn
+    t <- chooseInt (0, 100)
+    return Board {players = p, spaces = chunksOf 5 lv, turn = t}

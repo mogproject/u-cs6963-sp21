@@ -3,7 +3,7 @@ module Data.BoardSpec (spec) where
 import Data.Board
   ( Board (Board),
     Players,
-    Pos,
+    choosePlayers,
     players,
     readBoard,
     readPlayers,
@@ -12,31 +12,25 @@ import Data.Board
     writeBoard,
     writePlayers,
   )
-import Data.List (nub)
-import Data.List.Split
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
 
-newtype PlayersT = PlayersT {playersData :: Players} deriving (Show)
+--------------------------------------------------------------------------------
+-- Gen for property-based testing
+--------------------------------------------------------------------------------
 
-instance Arbitrary PlayersT where
+-- Wapper of Players
+newtype Players' = Players' Players deriving (Show)
+
+fromPlayers' :: Players' -> Players
+fromPlayers' (Players' p) = p
+
+instance Arbitrary Players' where
   arbitrary = do
     numPlayers <- chooseInt (0, 2)
-    positions <- choosePositions (numPlayers * 2)
-    return $ createPlayers positions
-    where
-      choosePos :: Gen Pos
-      choosePos = do
-        x <- chooseInt (1, 5)
-        y <- chooseInt (1, 5)
-        return (x, y)
-      choosePositions :: Int -> Gen [Pos]
-      choosePositions k = do
-        ls <- infiniteListOf choosePos
-        return $ (take k . nub) ls
-      createPlayers :: [Pos] -> PlayersT
-      createPlayers ps = PlayersT [(w, u) | [w, u] <- chunksOf 2 ps]
+    pl <- choosePlayers numPlayers
+    return $ Players' pl
 
 spec :: Spec
 spec = do
@@ -67,8 +61,8 @@ spec = do
       writePlayers [((1, 2), (3, 4)), ((2, 1), (4, 3))] `shouldBe` "[[[1,2],[3,4]],[[2,1],[4,3]]]"
 
   describe "Board#readPlayers()" $ do
-    prop "is inverse to writePlayers()" $ \t ->
-      let p = playersData t
+    prop "is inverse to writePlayers()" $ \pp ->
+      let p = fromPlayers' pp
        in (readPlayers . writePlayers) p `shouldBe` Just p
 
   describe "Board#readBoard()" $ do
@@ -159,3 +153,6 @@ spec = do
               }
       writeBoard b1 `shouldBe` "{\"turn\":18,\"spaces\":[[0,0,0,0,2],[1,1,2,0,0],[1,0,0,3,0],[0,0,3,0,0],[0,0,0,1,4]],\"players\":[[[2,3],[4,4]],[[2,5],[3,5]]]}"
       writeBoard b2 `shouldBe` "{\"turn\":0,\"spaces\":[[0,1,2,3,4],[0,1,2,3,4],[0,1,2,3,4],[0,1,2,3,4],[0,1,2,3,4]],\"players\":[[[5,5],[4,4]],[[3,3],[2,2]]]}"
+
+  describe "Board#readBoard()" $ do
+    prop "is inverse to writeBoard()" $ \b -> (readBoard . writeBoard) b `shouldBe` Just (b :: Board)
