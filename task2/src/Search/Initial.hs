@@ -17,12 +17,13 @@ retrieveElement rnd xs =
   let (n, gen) = randomR (0, Set.size xs - 1) rnd
    in (Set.elemAt n xs, Set.deleteAt n xs, gen)
 
-findStartingPlayer1 :: Int -> Workers
-findStartingPlayer1 seed =
-  let r0 = mkStdGen seed
-      (w1, ys, r1) = retrieveElement r0 allPositions
-      (w2, _, _) = retrieveElement r1 ys
-   in (w1, w2)
+findStartingPlayer1 :: Int -> Int -> Workers
+findStartingPlayer1 strategy seed | strategy == 0 =
+    let r0 = mkStdGen seed
+        (w1, ys, r1) = retrieveElement r0 allPositions
+        (w2, _, _) = retrieveElement r1 ys
+    in (w1, w2)
+findStartingPlayer1 strategy seed = ((1,1),(2,2))
 
 findStartingPlayer2 :: Int -> Workers -> Workers
 findStartingPlayer2 seed (u1, u2) =

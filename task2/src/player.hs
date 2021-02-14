@@ -35,7 +35,9 @@ usage p =
 processLine :: Int -> Int -> String -> String
 processLine seed lineNo line = case lineNo of
   0 -> case readPlayers line of
-    Just [] -> (cs . encode) [findStartingPlayer1 seed]
+    Just [] -> (cs . encode) [findStartingPlayer1 1 seed]
     Just [p] -> (cs . encode) [p, findStartingPlayer2 seed p]
     _ -> "unexpected input"
-  _ -> (show . readBoard) line
+  _ -> case readBoard line of
+    Just b -> "ok"
+    _ -> "unexpected input"
