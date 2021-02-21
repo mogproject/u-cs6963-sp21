@@ -55,6 +55,7 @@ test-suite spec
   main-is: Spec.hs
   other-modules:
       Data.BoardSpec
+      Search.InitialSpec
       Paths_santorini
   hs-source-dirs:
       test

@@ -13,3 +13,9 @@ $ stack test
 $ stack build
 $ stack exec santorini-player
 ```
+
+```
+$ stack build
+$ scripts/play.sh 1
+```
+

@@ -24,3 +24,5 @@ cabal.project.local~
 .DS_Store
 __pycache__/
 .vscode/
+task2/provided/
+

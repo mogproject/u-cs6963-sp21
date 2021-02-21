@@ -10,4 +10,4 @@ type GameMove = Int
 data GameState = GameState 
 
 fromBoard :: Board -> GameState
-fromBoard b = GameState 
+fromBoard _ = GameState 
