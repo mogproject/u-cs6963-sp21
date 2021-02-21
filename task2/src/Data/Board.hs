@@ -23,7 +23,7 @@ import Data.Aeson.Types
 import Data.String.Conversions (cs)
 import Test.QuickCheck
 import Data.List (nub)
-import Data.List.Split
+import Data.List.Split (chunksOf)
 
 -- dimension
 type Dim = Int

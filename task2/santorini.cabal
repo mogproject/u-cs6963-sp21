@@ -15,7 +15,6 @@ build-type:     Simple
 library
   exposed-modules:
       Data.Board
-      Data.Message
       Game.GameState
       Search.Initial
       Search.Search
@@ -32,6 +31,7 @@ library
     , random
     , split
     , string-conversions
+    , vector
   default-language: Haskell2010
 
 executable santorini-player
@@ -48,6 +48,7 @@ executable santorini-player
     , santorini
     , split
     , string-conversions
+    , vector
   default-language: Haskell2010
 
 test-suite spec
@@ -70,5 +71,6 @@ test-suite spec
     , santorini
     , split
     , string-conversions
+    , vector
   default-language: Haskell2010
   build-tool-depends: hspec-discover:hspec-discover == 2.*

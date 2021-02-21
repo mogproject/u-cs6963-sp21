@@ -1,12 +1,14 @@
 import Data.Aeson (decode, encode)
-import Data.String.Conversions (cs)
 import Data.Board (readBoard, readPlayers)
 import Data.List
+import Data.String.Conversions (cs)
+import Game.GameState (fromBoard, makeMove, toBoard)
+import Search.Initial (findStartingPlayer1, findStartingPlayer2)
+import Search.Search (findMove)
 import System.Environment (getArgs, getProgName)
 import System.IO
 import System.Random (StdGen, mkStdGen, randomR)
 import Text.Read (readMaybe)
-import Search.Initial (findStartingPlayer1, findStartingPlayer2)
 
 -- | Entry point of the program.
 main :: IO ()
@@ -35,9 +37,11 @@ usage p =
 processLine :: Int -> Int -> String -> String
 processLine seed lineNo line = case lineNo of
   0 -> case readPlayers line of
-    Just [] -> (cs . encode) [findStartingPlayer1 1 seed]
-    Just [p] -> (cs . encode) [p, findStartingPlayer2 1 seed p]
+    Just [] -> cs . encode $ [findStartingPlayer1 1 seed]
+    Just [p] -> cs . encode $ [p, findStartingPlayer2 1 seed p]
     _ -> "unexpected input"
   _ -> case readBoard line of
-    Just b -> "ok"
+    Just b ->
+      let st = fromBoard b
+       in cs . encode . toBoard . makeMove st $ findMove 1 seed st
     _ -> "unexpected input"
