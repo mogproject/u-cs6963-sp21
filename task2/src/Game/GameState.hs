@@ -122,7 +122,7 @@ makeMove (GameState {players = [[w1, w2], p2], levels = lv, turn = t, legalMoves
   | elem m mv =
     let (wk, _, mt, bl) = decodeMove m
         pl' = [p2, if wk == 0 then [mt, w2] else [w1, mt]]
-        lv' = Data.Map.adjust (1 +) bl lv
+        lv' = if (lv ! mt) < 3 then Data.Map.adjust (1 +) bl lv else lv
         t' = t + 1
         mv' = getLegalMoves pl' lv'
         sc' = evaluate pl' lv' t' mv'
