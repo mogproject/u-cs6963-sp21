@@ -100,10 +100,10 @@ class GameState:
         return '\n'.join(buf)
 
 
-EVAL_PROXIMITY = 50
-EVAL_FIRST_ASCENT = 300
-EVAL_HIDEOUT = 10
-EVAL_LEVELING = 1000
+# EVAL_PROXIMITY = 50
+# EVAL_FIRST_ASCENT = 300
+# EVAL_HIDEOUT = 10
+# EVAL_LEVELING = 1000
 EVAL_PROX_TABLE = [0, 100, 80, 50, 20, 0]
 EVAL_REACH_TABLE = [
     [  # turn to move advantages
@@ -137,7 +137,7 @@ def sign(player: int) -> float:
     return [1.0, -1.0][player]
 
 
-def isStack(state: GameState, player: int, worker: int) -> bool:
+def isStuck(state: GameState, player: int, worker: int) -> bool:
     index = state.players[player][worker]
     return all(nbr == -1 or state.levels[nbr] > state.levels[index] + 1 for nbr in neighborTable[index])
 
@@ -180,7 +180,7 @@ def evaluate(state: GameState) -> float:
     # 4. Stuck Bonus
     for p in range(2):
         for w in range(2):
-            if isStack(state, p, w):
+            if isStuck(state, p, w):
                 # one worker is stuck
                 ret[1 - p][3] = EVAL_STUCK_BONUS
 
