@@ -15,6 +15,7 @@ build-type:     Simple
 library
   exposed-modules:
       Data.Board
+      Game.Evaluation
       Game.GameState
       Search.Initial
       Search.Search
@@ -56,6 +57,7 @@ test-suite spec
   main-is: Spec.hs
   other-modules:
       Data.BoardSpec
+      Game.EvaluationSpec
       Search.InitialSpec
       Paths_santorini
   hs-source-dirs:

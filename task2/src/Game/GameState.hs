@@ -7,22 +7,25 @@ module Game.GameState
     players,
     levels,
     turn,
+    levelMap,
+    moveAdjacency,
+    buildAdjacency,
     legalMoves,
-    score,
+    Index,
+    Players,
+    Levels,
+    Bitmap,
+    AdjList,
+    toList,
+    fromList
   )
 where
 
-import Control.Monad (guard)
-import Data.Bits (complement, countTrailingZeros, popCount, shift, xor, (.&.), (.|.))
+import Data.Bits (complement, countTrailingZeros, shift, xor, (.&.), (.|.))
 import Data.Board (Board (Board))
 import qualified Data.Board
 import Data.Map (Map, (!))
 import qualified Data.Map
-import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
-import Data.Set (Set)
-import qualified Data.Set
--- import qualified Data.Vector as VB
 import qualified Data.Vector.Unboxed as V
 
 -- "vectorize" positions
@@ -44,8 +47,6 @@ type GameMove = Int
 
 type AdjList = Map Index Bitmap -- adjacency list from each index
 
-type Score = Int
-
 -- Internal representation of game states.
 data GameState = GameState
   { players :: Players, -- Players (player to move, player to wait)
@@ -54,8 +55,7 @@ data GameState = GameState
     levelMap :: LevelMap, -- level [0..4] -> bitmap
     moveAdjacency :: AdjList, -- move adjacency list: index [0..24] -> bitmap
     buildAdjacency :: AdjList, -- build adjacency list: index [0..24] -> bitmap
-    legalMoves :: [GameMove], -- Legal moves
-    score :: Score -- Evaluation
+    legalMoves :: [GameMove] -- Legal moves
   }
   deriving (Ord, Eq, Show)
 
@@ -93,14 +93,13 @@ fromBoard Board {Data.Board.players = [(w1, w2), (w3, w4)], Data.Board.spaces = 
       lv = Data.Map.fromList . zip [0 .. 24] $ concat sp
       lm = createLevelMap lv
       adjM = createMoveAdjacencyList lv lm
-      adjB = createBuildAdjacencyList lv lm
+      adjB = createBuildAdjacencyList lm
       mv = getLegalMoves pl adjM adjB
-      sc = evaluate pl lv t adjM adjB mv
-   in GameState {players = pl, levels = lv, turn = t, levelMap = lv, moveAdjacency = adjM, buildAdjacency = adjB, legalMoves = mv, score = sc}
+   in GameState {players = pl, levels = lv, turn = t, levelMap = lv, moveAdjacency = adjM, buildAdjacency = adjB, legalMoves = mv}
 fromBoard _ = undefined
 
 toBoard :: GameState -> Board
-toBoard GameState {players = [[w1, w2], [w3, w4]], levels = lv, turn = t, legalMoves = _, score = _} =
+toBoard GameState {players = [[w1, w2], [w3, w4]], levels = lv, turn = t, legalMoves = _} =
   let pl = [(fromIndex w1, fromIndex w2), (fromIndex w3, fromIndex w4)]
       sp = [[lv ! (r * 5 + c) | c <- [0 .. 4]] | r <- [0 .. 4]]
    in Board {Data.Board.players = pl, Data.Board.spaces = sp, Data.Board.turn = t}
@@ -126,8 +125,8 @@ createLevelMap lv = Data.Map.fromList [(l, fromList [fst x | x <- Data.Map.toLis
 createMoveAdjacencyList :: Levels -> LevelMap -> AdjList
 createMoveAdjacencyList lv lm = Data.Map.fromList [(i, (defaultNeighbors V.! i) .&. sum [lm ! h | h <- [0 .. (min 3 (lv ! i) + 1)]]) | i <- [0 .. 24]]
 
-createBuildAdjacencyList :: Levels -> LevelMap -> AdjList
-createBuildAdjacencyList lv lm = Data.Map.fromList [(i, (defaultNeighbors V.! i) .&. sum [lm ! h | h <- [0 .. 3]]) | i <- [0 .. 24]]
+createBuildAdjacencyList :: LevelMap -> AdjList
+createBuildAdjacencyList lm = Data.Map.fromList [(i, (defaultNeighbors V.! i) .&. sum [lm ! h | h <- [0 .. 3]]) | i <- [0 .. 24]]
 
 encodeMove :: WorkerId -> Index -> Index -> Index -> GameMove
 encodeMove wk mf mt bl = wk .|. (mf `shift` 1) .|. (mt `shift` 6) .|. (bl `shift` 11)
@@ -157,12 +156,11 @@ makeMove
       levelMap = lm,
       moveAdjacency = adjM,
       buildAdjacency = adjB,
-      legalMoves = mv,
-      score = _
+      legalMoves = _
     }
-  m =
+  mv =
     -- assume: m `elem` mv
-    let (wk, _, mt, bl) = decodeMove m
+    let (wk, _, mt, bl) = decodeMove mv
         pl' = [p2, if wk == 0 then [mt, w2] else [w1, mt]]
         prevLevel = lv ! bl
         nextLevel = prevLevel + (if (lv ! mt) == 3 then 0 else 1) -- do not build after a winning move
@@ -194,144 +192,5 @@ makeMove
             else adjB
 
         mv' = getLegalMoves pl' adjM' adjB'
-        sc' = evaluate pl' lv' t' adjM' adjB' mv'
-     in GameState {players = pl', levels = lv', turn = t', levelMap = lm', moveAdjacency = adjM', buildAdjacency = adjB', legalMoves = mv', score = sc'}
-
---------------------------------------------------------------------------------
--- Evaluation
---------------------------------------------------------------------------------
-
--- Constants
-scoreWin :: Score
-scoreWin = 1000000000 -- 1e9
-
-evalProxTable :: V.Vector Score
-evalProxTable = V.fromList [0, 100, 80, 50, 20, 0]
-
-evalProxTableSize :: Int
-evalProxTableSize = V.length evalProxTable
-
-getProxTableValue :: Int -> Score
-getProxTableValue dist = evalProxTable V.! min (evalProxTableSize - 1) dist
-
-evalReachTable :: V.Vector Score
-evalReachTable =
-  V.fromList $
-    concat
-      [ -- turn to move (advantageous)
-        [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
-        [300, 200, 40, 30, 20, 15, 12, 0], -- level 1
-        [10000, 2000, 500, 200, 150, 120, 110, 0], -- level 2
-        [scoreWin, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3
-        [0, 0, 0, 0, 0, 0, 0, 0], -- level 4
-
-        -- not turn to move
-        [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
-        [300, 100, 40, 30, 20, 15, 12, 0], -- level 1
-        [10000, 1000, 500, 200, 150, 120, 110, 0], -- level 2
-        [scoreWin, 10000, 5000, 2000, 1000, 500, 300, 0], -- level 3
-        [0, 0, 0, 0, 0, 0, 0, 0] -- level 4
-      ]
-
-evalReachTableSize :: Int
-evalReachTableSize = V.length evalReachTable `div` 10
-
-getReachTableValue :: Int -> Int -> Int -> Score
-getReachTableValue player lev dist = evalReachTable V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist)
-
-evalAsymTable :: V.Vector Score
-evalAsymTable =
-  V.fromList $
-    concat
-      [ [0, 0, 0, 1, 2, 3, 4, 5, 10], -- level 0
-        [0, 0, 0, 10, 20, 30, 40, 50, 100], -- level 1
-        [0, 100, 1000, 2000, 2000, 2000, 2000, 2000, 2000], -- level 2
-        [0, 1000, 20000, 30000, 30000, 30000, 30000, 30000, 30000], -- level 3
-        [0, 0, 0, 0, 0, 0, 0, 0, 0] -- level 4
-      ]
-
-evalAsymTableSize :: Int
-evalAsymTableSize = V.length evalAsymTable `div` 5
-
-getAsymTableValue :: Int -> Int -> Score
-getAsymTableValue lev dist = evalAsymTable V.! (lev * evalAsymTableSize + min (evalAsymTableSize - 1) dist)
-
-evalCornerBonus :: Score
-evalCornerBonus = 20
-
-evalStuckBonus :: Score
-evalStuckBonus = 25000
-
-evalPreventionAdvantage :: Score
-evalPreventionAdvantage = 20000
-
-evaluate :: Players -> Levels -> Turn -> AdjList -> AdjList -> [GameMove] -> Score
-evaluate pl lv _ adjM adjB mv =
-  if opponentWin
-    then - scoreWin
-    else
-      let ps = [fromList ws | ws <- pl] -- player bitmaps
-          dist = [[bfs adjM (complement (ps !! (1 - p))) (pl !! p !! w) | w <- [0, 1]] | p <- [0, 1]]
-          bestDist = [V.fromList [minimum [dist !! p !! w ! i | w <- [0, 1]] | i <- [0 .. 24]] | p <- [0, 1]]
-          funcs =
-            [ evaluateWorkerProximity pl dist,
-              evaluateReachability lv bestDist,
-              evaluateAsymmetry lv adjB bestDist,
-              evaluateStuckBonus pl adjM,
-              evaluatePrevention pl lv adjB bestDist
-            ]
-       in sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
-  where
-    -- FIXME: when cards are introduced
-    opponentWin = null mv || elem 3 [lv ! i | i <- pl !! 1]
-
--- (1) Worker Proximity
-evaluateWorkerProximity :: Players -> [[Map Index Int]] -> Int -> Score
-evaluateWorkerProximity pl dist p = sum [getProxTableValue (dist !! p !! w ! (pl !! p !! (1 - w))) | w <- [0, 1]]
-
--- (2) Reachability
-evaluateReachability :: Levels -> [V.Vector Int] -> Int -> Score
-evaluateReachability lv dist p = sum [getReachTableValue p (lv ! i) (dist !! p V.! i) | i <- [0 .. 24]]
-
--- (3) Asymmetry
-evaluateAsymmetry :: Levels -> AdjList -> [V.Vector Int] -> Int -> Score
-evaluateAsymmetry lv adj dist p = sum [g p i | i <- [0 .. 24]]
-  where
-    cornerBonus i = (8 - popCount (adj ! i)) * (lv ! i) * evalCornerBonus
-    g p i =
-      let diff = (dist !! (1 - p) V.! i) - (dist !! p V.! i)
-       in if diff > 0 then getAsymTableValue (lv ! i) diff else 0
-
--- (4) Stuck Bonus
-evaluateStuckBonus :: Players -> AdjList -> Int -> Score
-evaluateStuckBonus pl adj p = sum [if adj ! (pl !! p !! w) == 0 then evalStuckBonus else 0 | w <- [0, 1]]
-
--- (5) Prevension
-evaluatePrevention :: Players -> Levels -> AdjList -> [V.Vector Int] -> Int -> Score
-evaluatePrevention pl lv adj dist p = sum [f index | w <- [0, 1], let index = pl !! p !! w, lv ! index == 2]
-  where
-    f index = if minimum [dist !! (1 - p) V.! u | u <- toList (adj ! index)] >= 2 then evalPreventionAdvantage else 0
-
---------------------------------------------------------------------------------
--- Distance Computation
---------------------------------------------------------------------------------
-
-distInf :: Int
-distInf = 100 -- infinity distance
-
--- breadth-first search
-bfs :: AdjList -> Bitmap -> Index -> Map Index Int
-bfs adj avail start =
-  let initMap = Data.Map.fromList [(i, if i == start then 0 else distInf) | i <- [0 .. 24]]
-   in bfs' adj avail (Seq.singleton start) initMap
-
-bfs' :: AdjList -> Bitmap -> Seq Index -> Map Index Int -> Map Index Int
-bfs' adj avail q sofar | Seq.null q = sofar
-bfs' adj avail q sofar =
-  let x = q `Seq.index` 0
-      nbrs = toList $ (adj ! x) .&. avail
-      unseen = Seq.fromList [nbr | nbr <- nbrs, (sofar ! nbr) == distInf]
-      d = (sofar ! x) + 1
-      q' = Seq.drop 1 q Seq.>< unseen
-      sofar' = foldl (\m u -> Data.Map.insert u d m) sofar unseen
-   in bfs' adj avail q' sofar'
+     in GameState {players = pl', levels = lv', turn = t', levelMap = lm', moveAdjacency = adjM', buildAdjacency = adjB', legalMoves = mv'}
+makeMove _ _ = undefined
