@@ -43,5 +43,5 @@ processLine seed lineNo line = case lineNo of
   _ -> case readBoard line of
     Just b ->
       let st = fromBoard b
-       in cs . encode . toBoard . makeMove st $ findMove 1 seed st
+       in cs . encode . toBoard . makeMove st $ findMove 2 seed st
     _ -> "unexpected input"
