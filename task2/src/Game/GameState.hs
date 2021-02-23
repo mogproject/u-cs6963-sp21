@@ -17,7 +17,8 @@ module Game.GameState
     Bitmap,
     AdjList,
     toList,
-    fromList
+    fromList,
+    decodeMove,
   )
 where
 
@@ -93,9 +94,9 @@ fromBoard Board {Data.Board.players = [(w1, w2), (w3, w4)], Data.Board.spaces = 
       lv = Data.Map.fromList . zip [0 .. 24] $ concat sp
       lm = createLevelMap lv
       adjM = createMoveAdjacencyList lv lm
-      adjB = createBuildAdjacencyList lm
+      adjB = createBuildAdjacencyList lv lm
       mv = getLegalMoves pl adjM adjB
-   in GameState {players = pl, levels = lv, turn = t, levelMap = lv, moveAdjacency = adjM, buildAdjacency = adjB, legalMoves = mv}
+   in GameState {players = pl, levels = lv, turn = t, levelMap = lm, moveAdjacency = adjM, buildAdjacency = adjB, legalMoves = mv}
 fromBoard _ = undefined
 
 toBoard :: GameState -> Board
@@ -123,10 +124,10 @@ createLevelMap :: Levels -> LevelMap
 createLevelMap lv = Data.Map.fromList [(l, fromList [fst x | x <- Data.Map.toList lv, snd x == l]) | l <- [0 .. 4]]
 
 createMoveAdjacencyList :: Levels -> LevelMap -> AdjList
-createMoveAdjacencyList lv lm = Data.Map.fromList [(i, (defaultNeighbors V.! i) .&. sum [lm ! h | h <- [0 .. (min 3 (lv ! i) + 1)]]) | i <- [0 .. 24]]
+createMoveAdjacencyList lv lm = Data.Map.fromList [(i, if lv ! i == 4 then 0 else (defaultNeighbors V.! i) .&. sum [lm ! h | h <- [0 .. (min 3 ((lv ! i) + 1))]]) | i <- [0 .. 24]]
 
-createBuildAdjacencyList :: LevelMap -> AdjList
-createBuildAdjacencyList lm = Data.Map.fromList [(i, (defaultNeighbors V.! i) .&. sum [lm ! h | h <- [0 .. 3]]) | i <- [0 .. 24]]
+createBuildAdjacencyList :: Levels -> LevelMap -> AdjList
+createBuildAdjacencyList lv lm = Data.Map.fromList [(i, if lv ! i == 4 then 0 else (defaultNeighbors V.! i) .&. sum [lm ! h | h <- [0 .. 3]]) | i <- [0 .. 24]]
 
 encodeMove :: WorkerId -> Index -> Index -> Index -> GameMove
 encodeMove wk mf mt bl = wk .|. (mf `shift` 1) .|. (mt `shift` 6) .|. (bl `shift` 11)
@@ -169,27 +170,28 @@ makeMove
 
         -- update level map
         f = Data.Map.adjust (xor (1 `shift` bl)) -- toggle bl bit
+        f' = Data.Map.adjust (.&. complement (1 `shift` bl)) -- remove bl bit
         lm' = f nextLevel $ f prevLevel lm
 
         -- update adjacency lists
         addArc m =
           if nextLevel <= 2 -- add arc: bl -> high N(bl)
-            then Data.Map.adjust (.|. ((defaultNeighbors V.! bl) .&. (lm' ! (nextLevel + 1)))) bl m
+            then Data.Map.adjust (.|. ((defaultNeighbors V.! bl) .&. (lm ! (nextLevel + 1)))) bl m
             else m
         removeArc m =
-          if prevLevel >= 1 -- remove arc: low N(bl) -> bl
-            then foldl (flip f) m (toList (defaultNeighbors V.! bl .&. (lm' ! (prevLevel - 1))))
+          if nextLevel >= 2 -- remove arc: low N(bl) -> bl
+            then foldl (flip f) m (toList ((defaultNeighbors V.! bl) .&. (lm ! (nextLevel - 2))))
             else m
 
-        adjM' =
-          if nextLevel == 4
-            then foldl (flip f) adjM (toList (adjB ! bl)) -- capped; we only care about the neighbors where we can build
-            else (removeArc . addArc) adjM
+        adjM'
+          | prevLevel == nextLevel = adjM
+          | nextLevel == 4 = foldl (flip f') (Data.Map.insert bl 0 adjM) (toList (adjB ! bl)) -- capped
+          | otherwise = (removeArc . addArc) adjM
 
-        adjB' =
-          if nextLevel == 4
-            then foldl (flip f) adjB (toList (adjB ! bl)) -- capped
-            else adjB
+        adjB'
+          | prevLevel == nextLevel = adjB
+          | nextLevel == 4 = foldl (flip f') (Data.Map.insert bl 0 adjB) (toList (adjB ! bl)) -- capped
+          | otherwise = adjB
 
         mv' = getLegalMoves pl' adjM' adjB'
      in GameState {players = pl', levels = lv', turn = t', levelMap = lm', moveAdjacency = adjM', buildAdjacency = adjB', legalMoves = mv'}

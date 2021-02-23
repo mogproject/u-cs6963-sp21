@@ -28,9 +28,7 @@ searchMiniMax g@GameState {GS.legalMoves = mv} depth shouldMaximize sofar =
     Just sc -> ((if shouldMaximize then 1 else -1) * sc, sofar) -- terminal node
     Nothing ->
       let nextMiniMaxScores = [searchMiniMax (makeMove g m) (depth -1) (not shouldMaximize) (m : sofar) | m <- mv] :: [(Score, [GameMove])]
-       in if shouldMaximize
-            then maximumBy (comparing fst) nextMiniMaxScores
-            else minimumBy (comparing fst) nextMiniMaxScores
+       in (if shouldMaximize then maximumBy else minimumBy) (comparing fst) nextMiniMaxScores
 
 -- Alpha-beta search
 -- searchAlphaBeta :: GameState -> Int -> GameMove

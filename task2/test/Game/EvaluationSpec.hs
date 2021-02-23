@@ -1,18 +1,34 @@
 module Game.EvaluationSpec (spec) where
 
+-- Board (Board),
+-- Players,
+-- choosePlayers,
+-- players,
+
+-- readPlayers,
+-- spaces,
+-- turn,
+
+-- writePlayers,
+
+--  GameMove,
+-- GameState (GameState),
+-- evaluate,
+
+-- levels,
+
+-- players,
+-- toBoard,
+-- turn,`
+
+import Control.Monad
 import Data.Board
-  ( -- Board (Board),
-    -- Players,
-    -- choosePlayers,
-    -- players,
-    readBoard,
-    -- readPlayers,
-    -- spaces,
-    -- turn,
-    -- writeBoard,
-    -- writePlayers,
+  ( readBoard,
+    writeBoard,
   )
+import Data.List (maximumBy, minimumBy, sortBy)
 import Data.Maybe (fromMaybe)
+import Data.Ord (comparing)
 import Game.Evaluation
   ( evaluate,
     evaluateAsymmetry',
@@ -22,18 +38,15 @@ import Game.Evaluation
     evaluateWorkerProximity',
   )
 import Game.GameState
-  ( --  GameMove,
-    -- GameState (GameState),
-    -- evaluate,
+  ( decodeMove,
     fromBoard,
-    -- legalMoves,
-    -- levels,
-    -- makeMove,
-    -- players,
-    -- toBoard,
-    -- turn,`
+    legalMoves,
+    makeMove,
+    toBoard,
   )
 import Test.Hspec
+import Test.Hspec.QuickCheck
+import Test.QuickCheck
 
 eval :: String -> Int
 eval s = evaluate $ fromBoard (fromMaybe undefined (readBoard s))
@@ -100,9 +113,61 @@ spec = do
     it "prefers climbing up" $ do
       let s41 = "{\"players\":[[[3,2],[4,1]],[[4,4],[4,5]]],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[1,0,0,0,0],[0,0,0,0,0],[0,0,0,0,2]],\"turn\":3}"
       let s42 = "{\"players\":[[[3,2],[4,1]],[[4,4],[5,5]]],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[1,0,0,0,0],[0,0,0,0,1],[0,0,0,0,1]],\"turn\":3}"
-
       -- printInfo s41
       -- printInfo s42
 
       -- s42 is better for Player 1
       eval s41 > eval s42 `shouldBe` True
+
+      let s43 = "{\"players\":[[[2,2],[4,2]],[[4,4],[4,5]]],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,2]],\"turn\":3}"
+      let s44 = "{\"players\":[[[2,2],[4,2]],[[4,4],[5,5]]],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,1],[0,0,1,0,1]],\"turn\":3}"
+
+      -- eval s44 `shouldBe` -2005
+
+      -- printInfo s43
+      -- printInfo s44
+      eval s44 < eval s43 `shouldBe` True
+
+    it "works with several initial positions" $ do
+      let s51 = "{\"turn\":0,\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],\"players\":[[[4,4],[5,5]],[[1,1],[2,2]]]}"
+      let b51 = fromBoard (fromMaybe undefined (readBoard s51))
+
+      let nextStates = [(m, makeMove b51 m) | m <- legalMoves b51]
+      let nextMove = minimumBy (comparing fst) [(evaluate st, m) | (m, st) <- nextStates]
+
+      -- print $ sortBy (comparing fst) [(evaluate st, m) | (m, st) <- nextStates]
+
+      let s52 = "{\"players\":[[[4,4],[5,4]],[[2,2],[4,2]]],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,1]],\"turn\":2}"
+      let b52 = fromBoard (fromMaybe undefined (readBoard s52))
+      -- print [((-1) * evaluate (makeMove b52 m), m) | m <- legalMoves b52]
+      -- print $ maximumBy (comparing fst) [((-1) * evaluate (makeMove b52 m), m) | m <- legalMoves b52]
+      let bestMove = snd $ maximumBy (comparing fst) [((-1) * evaluate (makeMove b52 m), m) | m <- legalMoves b52]
+      bestMove `elem` legalMoves b52 `shouldBe` True
+
+      -- print (evaluate (makeMove b52 bestMove))
+      -- print $ writeBoard (toBoard (makeMove b52 bestMove))
+
+    it "makeMove should not affect the evaluation" $ do
+      let s52 = "{\"players\":[[[4,4],[5,4]],[[2,2],[4,2]]],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,1]],\"turn\":2}"
+      let b52 = fromBoard (fromMaybe undefined (readBoard s52))
+      let b52' = makeMove b52 50415
+
+      let s53 = "{\"players\":[[[2,2],[4,2]],[[4,4],[4,5]]],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,2]],\"turn\":3}"
+      let b53 = fromBoard (fromMaybe undefined (readBoard s53))
+
+      toBoard b52' `shouldBe` toBoard b53
+      b52' `shouldBe` b53
+      eval s53 `shouldBe` evaluate b52'
+
+  describe "GameState#makeMove()" $ do
+    prop "does not have side effects" $ \b ->
+      let state = fromBoard b
+          moves = legalMoves state
+          nextStates = [makeMove state m | m <- moves]
+       in -- do
+          --  print $ head moves
+          --  (fromBoard . toBoard) (head nextStates) `shouldBe` (head nextStates)
+          foldl
+            (\_ x -> (fromBoard . toBoard) x `shouldBe` x)
+            (True `shouldBe` True)
+            nextStates

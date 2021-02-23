@@ -158,7 +158,7 @@ evaluate
       levelMap = _,
       moveAdjacency = adjM,
       buildAdjacency = adjB,
-      legalMoves = mv
+      legalMoves = _
     } = case evaluate' g of
     Just sc -> sc
     Nothing ->
@@ -179,8 +179,8 @@ evaluate'
       levels = lv,
       turn = _,
       levelMap = _,
-      moveAdjacency = adjM,
-      buildAdjacency = adjB,
+      moveAdjacency = _,
+      buildAdjacency = _,
       legalMoves = mv
     } =
     if opponentWin
