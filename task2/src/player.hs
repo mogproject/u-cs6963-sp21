@@ -51,5 +51,5 @@ processLine s lineNo line = case lineNo of
   _ -> case readBoard line of
     Just b ->
       let st = fromBoard b
-       in cs . encode . toBoard . makeMove st $ findMove 2 s st
+       in cs . encode . toBoard . makeMove st $ findMove 3 s st
     _ -> "unexpected input"
