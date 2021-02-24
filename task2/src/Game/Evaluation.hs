@@ -21,10 +21,12 @@ import Game.GameState
   ( AdjList,
     Bitmap,
     GameState (GameState),
+    GameMove,
     Index,
     Levels,
     Players,
     buildAdjacency,
+    decodeMove,
     fromList,
     legalMoves,
     levelMap,
@@ -160,8 +162,8 @@ evaluate
       buildAdjacency = adjB,
       legalMoves = _
     } = case evaluate' g of
-    Just sc -> sc
-    Nothing ->
+    (Just sc, _) -> sc
+    (Nothing, _) ->
       let (dist, bestDist) = getDistances pl adjM
           funcs =
             [ evaluateWorkerProximity pl dist,
@@ -172,23 +174,26 @@ evaluate
             ]
        in sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
 
-evaluate' :: GameState -> Maybe Score
+evaluate' :: GameState -> (Maybe Score, Maybe GameMove)
 evaluate'
   GameState
     { players = pl,
       levels = lv,
       turn = _,
-      levelMap = _,
-      moveAdjacency = _,
+      levelMap = lm,
+      moveAdjacency = adjM,
       buildAdjacency = _,
       legalMoves = mv
-    } =
-    if opponentWin
-      then Just (- scoreWin)
-      else Nothing
+    }
+    | opponentWin = (Just (- scoreWin), Nothing)
+    | canWin = (Just scoreWin, Just (head [m | m <- mv, let (_, _, mt, _) = decodeMove m, lv ! mt == 3]))
+    | otherwise = (Nothing, Nothing)
     where
       -- FIXME: when cards are introduced
       opponentWin = null mv || elem 3 [lv ! i | i <- pl !! 1]
+      canWin = any (\i -> (adjM ! i) .&. (lm ! 3) /= 0) (pl !! 0)
+      -- TODO: implement
+      canOpponentWin = undefined
 
 -- (1) Worker Proximity
 evaluateWorkerProximity :: Players -> [[Map Index Int]] -> Int -> Score
