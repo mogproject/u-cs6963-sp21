@@ -59,8 +59,8 @@ def assertScoreLessThan(s1, s2, description):
     st1, st2 = gs.fromJSON(s1), gs.fromJSON(s2)
     sc1, sc2 = st1.score, st2.score
 
-    # print(st1)
     # print(st2)
+    # print(st1)
     assert sc1 < sc2, f'not {sc1} < {sc2}: {description}\n{st1}\n{st2}'
 
 def test_scoring():
@@ -87,4 +87,4 @@ def test_scoring():
     print('ok')
 
 test_scoring()
-f1()
+# f1()

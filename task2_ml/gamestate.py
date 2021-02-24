@@ -175,7 +175,7 @@ def evaluate(state: GameState) -> float:
                 # corner bonus
                 cnt = sum(1 if neighborTable[i][d] == -1 or not state.available[neighborTable[i][d]] else 0 for d in range(8))
                 ret[p][2] += cnt * EVAL_CORNER_BONUS * state.levels[i]
-                ret[p][2] += EVAL_ASYM_TABLE[state.levels[i]][min(len(EVAL_ASYM_TABLE) - 1, dist[1 - p][i] - dist[p][i])]
+                ret[p][2] += EVAL_ASYM_TABLE[state.levels[i]][min(len(EVAL_ASYM_TABLE[0]) - 1, dist[1 - p][i] - dist[p][i])]
 
     # 4. Stuck Bonus
     for p in range(2):
