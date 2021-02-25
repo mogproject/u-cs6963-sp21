@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.3.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 41068599f8c73630cf4b045d4650817dfde3f65f5fe41008235c105abfa25edc
 
 name:           santorini
 version:        0.0.1
@@ -59,8 +61,13 @@ test-suite spec
       Data.BoardSpec
       Game.EvaluationSpec
       Search.InitialSpec
+      Data.BoardSpec
+      Game.EvaluationSpec
+      Search.InitialSpec
+      Spec
       Paths_santorini
   hs-source-dirs:
+      test
       test
   ghc-options: -Wall
   build-depends:

@@ -43,7 +43,7 @@ searchMiniMax' g@GameState {GS.legalMoves = mv} depth shouldMaximize sofar =
 --------------------------------------------------------------------------------
 
 searchAlphaBetaNaive :: GameState -> Int -> GameMove
-searchAlphaBetaNaive g depth = last . snd $ searchAlphaBetaNaive' g depth (- scoreWin - 1) (scoreWin + 1) True []
+searchAlphaBetaNaive g depth = last . snd $ searchAlphaBetaNaive' g depth (- scoreWin) scoreWin True []
 
 searchAlphaBetaNaive' :: GameState -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove])
 -- reached depth limit
@@ -76,7 +76,7 @@ searchAlphaBetaNaive'' ((mv, st) : gs) depth alpha beta shouldMaximize sofar (be
 
 -- Alpha-beta with reordering heuristic
 searchAlphaBetaReordering :: GameState -> Int -> GameMove
-searchAlphaBetaReordering g depth = last . snd $ searchAlphaBetaReordering' g depth (- scoreWin - 1) (scoreWin + 1) True []
+searchAlphaBetaReordering g depth = last . snd $ searchAlphaBetaReordering' g depth (- scoreWin) scoreWin True []
 
 searchAlphaBetaReordering' :: GameState -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove])
 -- reached depth limit
