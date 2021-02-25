@@ -25,4 +25,5 @@ cabal.project.local~
 __pycache__/
 .vscode/
 task2/provided/
+task3/provided/
 
