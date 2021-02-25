@@ -4,7 +4,7 @@ Santorini benchmark launcher.
 """
 
 __author__ = 'Yosuke Mizutani'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 __license__ = 'Apache License, Version 2.0'
 
 import sys
@@ -105,7 +105,7 @@ def main(args):
 
         print(f'Player {p + 1} Time (sec):')
         print(f'  Mean: {mean:.6f}, StdDev: {pstdev:.6f}')
-        print(f'  Min: {min_val:.6f}, 1st Quantile: {quant[0]:.6f}, Median: {quant[1]:.6f}, 3rd Quantile: {quant[0]:.6f}, Max: {max_val:.6f}')
+        print(f'  Min: {min_val:.6f}, 1st Quantile: {quant[0]:.6f}, Median: {quant[1]:.6f}, 3rd Quantile: {quant[2]:.6f}, Max: {max_val:.6f}')
         print()
 
 
