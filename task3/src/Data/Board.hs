@@ -31,7 +31,7 @@ import Data.List.Split (chunksOf)
 import qualified Data.Map
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.String.Conversions (cs)
-import GHC.Generics
+import GHC.Generics ( Generic )
 import Test.QuickCheck (Arbitrary, Gen, arbitrary, chooseInt, shuffle, vectorOf)
 
 -- dimension
@@ -64,20 +64,11 @@ instance FromJSON Player where
 instance ToJSON Player where
   toJSON = genericToJSON defaultOptions {omitNothingFields = True}
 
--- instance FromJSON Player where
--- parseJSON = withObject "player" $ \o -> Player <$> o .: "card" <*> o .:? "tokens"
-
--- instance ToJSON Player where
--- toJSON p = object $ ["card" .= card p] ++ ["tokens" .= x | x <- maybeToList (tokens p)]
-
 instance FromJSON Board where
   parseJSON = genericParseJSON defaultOptions
-  -- parseJSON = withObject "board" $ \o -> Board <$> o .: "players" <*> o .: "spaces" <*> o .: "turn"
 
 instance ToJSON Board where
   toJSON = genericToJSON defaultOptions
-  -- object ["players" .= players b, "spaces" .= spaces b, "turn" .= turn b]
-  -- toJSON b = object ["players" .= players b, "spaces" .= spaces b, "turn" .= turn b]
 
 --------------------------------------------------------------------------------
 -- Validation

@@ -1,6 +1,8 @@
 cradle:
   stack:
-    - path: "./src/"
+    - path: "src/"
+      component: "santorini:lib"
+    - path: "src/"
       component: "santorini:exe:santorini-player"
-    - path: "./test/"
-      component: "santorini:test:santorini-spec"
+    - path: "test/"
+      component: "santorini:test"

@@ -27,9 +27,11 @@ executables:
     dependencies: [santorini]
 
 tests:
-  spec:
+  santorini-test:
     main: Spec.hs
-    source-dirs: test
+    source-dirs:
+      - src
+      - test
     defaults: hspec/hspec@master
     dependencies:
       - santorini

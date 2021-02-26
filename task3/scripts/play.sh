@@ -2,7 +2,7 @@
 
 SCRIPT_DIR=$( cd "$( dirname "$0" )" && pwd -P )
 PROJECT_ROOT=$( dirname "${SCRIPT_DIR}" )
-JUDGE_DIR="${PROJECT_ROOT}/provided/santorini-mac/bin"
+JUDGE_DIR="${PROJECT_ROOT}/provided/santorini-cards-mac/bin"
 MY_PLAYER="${PROJECT_ROOT}/.stack-work/dist/x86_64-osx/Cabal-3.2.1.0/build/santorini-player/santorini-player"
 
 usage() {
