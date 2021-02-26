@@ -5,4 +5,4 @@ cradle:
     - path: "src/"
       component: "santorini:exe:santorini-player"
     - path: "test/"
-      component: "santorini:test"
+      component: "santorini:test:santorini-test"

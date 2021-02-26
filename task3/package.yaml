@@ -23,14 +23,14 @@ library:
 
 executables:
   santorini-player:
-    main: src/player.hs
+    main: player.hs
+    source-dirs: [src]
     dependencies: [santorini]
 
 tests:
   santorini-test:
-    main: Spec.hs
+    main: Main.hs
     source-dirs:
-      - src
       - test
     defaults: hspec/hspec@master
     dependencies:

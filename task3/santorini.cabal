@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b912f27ea1f5bb9635bffa22a38179345a9a7af0a622c8d80735caf14bfda938
+-- hash: 92449705bb30b2d07ae4e8aa5c314f7962950582dadadb2c01c2c79750bc218a
 
 name:           santorini
 version:        0.1.0
@@ -17,6 +17,7 @@ build-type:     Simple
 library
   exposed-modules:
       Data.Board
+      Data.BoardWithoutCard
       Data.Card
       Game.Evaluation
       Game.GameMove
@@ -41,9 +42,19 @@ library
   default-language: Haskell2010
 
 executable santorini-player
-  main-is: src/player.hs
+  main-is: player.hs
   other-modules:
+      Data.Board
+      Data.BoardWithoutCard
+      Data.Card
+      Game.Evaluation
+      Game.GameMove
+      Game.GameState
+      Search.Initial
+      Search.Search
       Paths_santorini
+  hs-source-dirs:
+      src
   ghc-options: -Wall
   build-depends:
       QuickCheck
@@ -60,14 +71,20 @@ executable santorini-player
 
 test-suite santorini-test
   type: exitcode-stdio-1.0
-  main-is: Spec.hs
+  main-is: Main.hs
   other-modules:
       Data.BoardSpec
+      Data.BoardWithoutCardSpec
       Game.EvaluationSpec
+      Search.InitialSpec
+      Data.BoardSpec
+      Data.BoardWithoutCardSpec
+      Game.EvaluationSpec
+      Main
       Search.InitialSpec
       Paths_santorini
   hs-source-dirs:
-      src
+      test
       test
   ghc-options: -Wall
   build-depends:
