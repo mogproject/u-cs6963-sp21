@@ -1,11 +1,13 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.3.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 474a98ea595b3feb1baa5f4039af2fa94efd97ad2bf2e2256c2b6b38256333de
 
 name:           santorini
-version:        0.0.1
+version:        0.1.0
 author:         Yosuke Mizutani <yos@cs.utah.edu>
 maintainer:     Yosuke Mizutani <yos@cs.utah.edu>
 copyright:      (c) 2021 Yosuke Mizutani
@@ -15,6 +17,7 @@ build-type:     Simple
 library
   exposed-modules:
       Data.Board
+      Data.Card
       Game.Evaluation
       Game.GameState
       Search.Initial
@@ -29,6 +32,7 @@ library
     , aeson
     , base ==4.*
     , containers
+    , hashtables
     , random
     , split
     , string-conversions
@@ -45,6 +49,7 @@ executable santorini-player
     , aeson
     , base ==4.*
     , containers
+    , hashtables
     , random
     , santorini
     , split
@@ -68,6 +73,7 @@ test-suite spec
     , aeson
     , base ==4.*
     , containers
+    , hashtables
     , hspec
     , random
     , santorini

@@ -1,5 +1,5 @@
 name: santorini
-version: 0.0.1
+version: 0.1.0
 license: Apache-2.0
 copyright: (c) 2021 Yosuke Mizutani
 author: Yosuke Mizutani <yos@cs.utah.edu>
@@ -15,6 +15,7 @@ dependencies:
   - string-conversions
   - split
   - vector
+  - hashtables
   - QuickCheck
 
 library:
@@ -30,4 +31,6 @@ tests:
     main: Spec.hs
     source-dirs: test
     defaults: hspec/hspec@master
-    dependencies: [santorini, hspec]
+    dependencies:
+      - santorini
+      - hspec

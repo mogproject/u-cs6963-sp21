@@ -23,11 +23,12 @@ module Game.GameState
 where
 
 import Data.Bits (complement, countTrailingZeros, shift, xor, (.&.), (.|.))
-import Data.Board (Board (Board))
+import Data.Board (Board (Board), Player (Player))
 import qualified Data.Board
 import Data.Map (Map, (!))
 import qualified Data.Map
 import qualified Data.Vector.Unboxed as V
+import Data.Card (Card (Apollo))
 
 -- "vectorize" positions
 type Index = Int -- 0 (row=1, col=1), 1 (row=1, col=2), ..., 24 (row=5, col=5)
@@ -89,7 +90,7 @@ fromIndex :: Index -> Data.Board.Pos
 fromIndex i = (i `div` 5 + 1, i `mod` 5 + 1)
 
 fromBoard :: Board -> GameState
-fromBoard Board {Data.Board.players = [(w1, w2), (w3, w4)], Data.Board.spaces = sp, Data.Board.turn = t} =
+fromBoard Board {Data.Board.players = (Player {Data.Board.tokens = Just (w1, w2)}, Player {Data.Board.tokens = Just (w3, w4)}), Data.Board.spaces = sp, Data.Board.turn = t} =
   let pl = [[toIndex w1, toIndex w2], [toIndex w3, toIndex w4]]
       lv = Data.Map.fromList . zip [0 .. 24] $ concat sp
       lm = createLevelMap lv
@@ -101,7 +102,10 @@ fromBoard _ = undefined
 
 toBoard :: GameState -> Board
 toBoard GameState {players = [[w1, w2], [w3, w4]], levels = lv, turn = t, legalMoves = _} =
-  let pl = [(fromIndex w1, fromIndex w2), (fromIndex w3, fromIndex w4)]
+  let pl =
+        ( Player {Data.Board.card = Apollo, Data.Board.tokens = Just (fromIndex w1, fromIndex w2)},
+          Player {Data.Board.card = Apollo, Data.Board.tokens = Just (fromIndex w3, fromIndex w4)}
+        )
       sp = [[lv ! (r * 5 + c) | c <- [0 .. 4]] | r <- [0 .. 4]]
    in Board {Data.Board.players = pl, Data.Board.spaces = sp, Data.Board.turn = t}
 toBoard _ = undefined

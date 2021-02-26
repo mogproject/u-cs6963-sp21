@@ -1,5 +1,5 @@
 import Data.Aeson (encode)
-import Data.Board (readBoard, readPlayers)
+import Data.Board (Player (Player), card, readBoard, readPlayers, tokens)
 import Data.Maybe (fromMaybe)
 import Data.String.Conversions (cs)
 import Game.GameState (fromBoard, makeMove, toBoard)
@@ -45,8 +45,8 @@ usage p =
 processLine :: Int -> Int -> String -> String
 processLine s lineNo line = case lineNo of
   0 -> case readPlayers line of
-    Just [] -> cs . encode $ [findStartingPlayer1 1 s]
-    Just [p] -> cs . encode $ [p, findStartingPlayer2 1 s p]
+    Just p@(Player {tokens = Nothing}, Player {tokens = Nothing}) -> cs . encode $ findStartingPlayer1 1 s p
+    Just p@(Player {tokens = Nothing}, Player {tokens = Just _}) -> cs . encode $ findStartingPlayer2 1 s p
     _ -> "unexpected input"
   _ -> case readBoard line of
     Just b ->
