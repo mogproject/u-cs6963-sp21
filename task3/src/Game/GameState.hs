@@ -3,6 +3,8 @@ module Game.GameState
     GameMove,
     fromBoard,
     toBoard,
+    fromBoardWithoutCard,
+    toBoardWithoutCard,
     makeMove,
     players,
     levels,
@@ -25,15 +27,18 @@ where
 import Data.Bits (complement, countTrailingZeros, shift, xor, (.&.), (.|.))
 import Data.Board (Board (Board), Player (Player))
 import qualified Data.Board
+import qualified Data.BoardWithoutCard
+import Data.Card (Card (Apollo))
 import Data.Map (Map, (!))
 import qualified Data.Map
 import qualified Data.Vector.Unboxed as V
-import Data.Card (Card (Apollo))
 
 -- "vectorize" positions
 type Index = Int -- 0 (row=1, col=1), 1 (row=1, col=2), ..., 24 (row=5, col=5)
 
 type WorkerId = Int -- 0 or 1
+
+type Cards = [Maybe Card]
 
 type Players = [[Index]]
 
@@ -51,7 +56,8 @@ type AdjList = Map Index Bitmap -- adjacency list from each index
 
 -- Internal representation of game states.
 data GameState = GameState
-  { players :: Players, -- Players (player to move, player to wait)
+  { cards :: Cards, -- Cards (player to move, player to wait)
+    players :: Players, -- Players (player to move, player to wait)
     levels :: Levels, -- Levels
     turn :: Turn,
     levelMap :: LevelMap, -- level [0..4] -> bitmap
@@ -89,26 +95,49 @@ toIndex (r, c) = (r - 1) * 5 + (c - 1)
 fromIndex :: Index -> Data.Board.Pos
 fromIndex i = (i `div` 5 + 1, i `mod` 5 + 1)
 
-fromBoard :: Board -> GameState
-fromBoard Board {Data.Board.players = (Player {Data.Board.tokens = Just (w1, w2)}, Player {Data.Board.tokens = Just (w3, w4)}), Data.Board.spaces = sp, Data.Board.turn = t} =
+fromBoard' :: Maybe Card -> Maybe Card -> Data.Board.Workers -> Data.Board.Workers -> [[Data.Board.Level]] -> Int -> GameState
+fromBoard' c1 c2 (w1, w2) (w3, w4) sp t =
   let pl = [[toIndex w1, toIndex w2], [toIndex w3, toIndex w4]]
       lv = Data.Map.fromList . zip [0 .. 24] $ concat sp
       lm = createLevelMap lv
       adjM = createMoveAdjacencyList lv lm
       adjB = createBuildAdjacencyList lv lm
       mv = getLegalMoves pl adjM adjB
-   in GameState {players = pl, levels = lv, turn = t, levelMap = lm, moveAdjacency = adjM, buildAdjacency = adjB, legalMoves = mv}
+   in GameState {cards = [c1, c2], players = pl, levels = lv, turn = t, levelMap = lm, moveAdjacency = adjM, buildAdjacency = adjB, legalMoves = mv}
+
+fromBoard :: Board -> GameState
+fromBoard
+  Board
+    { Data.Board.players =
+        ( Player {Data.Board.card = c1, Data.Board.tokens = Just w1},
+          Player {Data.Board.card = c2, Data.Board.tokens = Just w2}
+          ),
+      Data.Board.spaces = sp,
+      Data.Board.turn = t
+    } = fromBoard' (Just c1) (Just c2) w1 w2 sp t
 fromBoard _ = undefined
 
+fromBoardWithoutCard :: Data.BoardWithoutCard.Board -> GameState
+fromBoardWithoutCard Data.BoardWithoutCard.Board {Data.BoardWithoutCard.players = [w1, w2], Data.BoardWithoutCard.spaces = sp, Data.BoardWithoutCard.turn = t} =
+  fromBoard' Nothing Nothing w1 w2 sp t
+fromBoardWithoutCard _ = undefined
+
 toBoard :: GameState -> Board
-toBoard GameState {players = [[w1, w2], [w3, w4]], levels = lv, turn = t, legalMoves = _} =
+toBoard GameState {cards = [Just c1, Just c2], players = [[w1, w2], [w3, w4]], levels = lv, turn = t} =
   let pl =
-        ( Player {Data.Board.card = Apollo, Data.Board.tokens = Just (fromIndex w1, fromIndex w2)},
-          Player {Data.Board.card = Apollo, Data.Board.tokens = Just (fromIndex w3, fromIndex w4)}
+        ( Player {Data.Board.card = c1, Data.Board.tokens = Just (fromIndex w1, fromIndex w2)},
+          Player {Data.Board.card = c2, Data.Board.tokens = Just (fromIndex w3, fromIndex w4)}
         )
       sp = [[lv ! (r * 5 + c) | c <- [0 .. 4]] | r <- [0 .. 4]]
    in Board {Data.Board.players = pl, Data.Board.spaces = sp, Data.Board.turn = t}
 toBoard _ = undefined
+
+toBoardWithoutCard :: GameState -> Data.BoardWithoutCard.Board
+toBoardWithoutCard GameState {players = [[w1, w2], [w3, w4]], levels = lv, turn = t} =
+  let pl = [(fromIndex w1, fromIndex w2), (fromIndex w3, fromIndex w4)]
+      sp = [[lv ! (r * 5 + c) | c <- [0 .. 4]] | r <- [0 .. 4]]
+   in Data.BoardWithoutCard.Board {Data.BoardWithoutCard.players = pl, Data.BoardWithoutCard.spaces = sp, Data.BoardWithoutCard.turn = t}
+toBoardWithoutCard _ = undefined
 
 --------------------------------------------------------------------------------
 -- Moves
@@ -155,7 +184,8 @@ getLegalMoves pl adjM adjB = do
 makeMove :: GameState -> GameMove -> GameState
 makeMove
   GameState
-    { players = [[w1, w2], p2],
+    { cards = [c1, c2],
+      players = [[w1, w2], p2],
       levels = lv,
       turn = t,
       levelMap = lm,
@@ -198,5 +228,5 @@ makeMove
           | otherwise = adjB
 
         mv' = getLegalMoves pl' adjM' adjB'
-     in GameState {players = pl', levels = lv', turn = t', levelMap = lm', moveAdjacency = adjM', buildAdjacency = adjB', legalMoves = mv'}
+     in GameState {cards = [c2, c1], players = pl', levels = lv', turn = t', levelMap = lm', moveAdjacency = adjM', buildAdjacency = adjB', legalMoves = mv'}
 makeMove _ _ = undefined

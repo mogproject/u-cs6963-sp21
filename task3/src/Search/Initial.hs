@@ -5,7 +5,8 @@ module Search.Initial
   )
 where
 
-import Data.Board (Player(Player), Players, Pos, Workers, card, tokens)
+import Data.Board (Pos, Workers)
+import Data.Card (Card)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -20,17 +21,16 @@ retrieveElement rnd xs =
   let (n, gen) = randomR (0, Set.size xs - 1) rnd
    in (Set.elemAt n xs, Set.deleteAt n xs, gen)
 
-findStartingPlayer1 :: Int -> Int -> Players -> Players
+findStartingPlayer1 :: Int -> Int -> Maybe (Card, Card) -> Workers
 -- Strategy 0: random
-findStartingPlayer1 strategy seed (Player {card = c}, p2@Player {card = _})
+findStartingPlayer1 strategy seed _
   | strategy == 0 =
     let r0 = mkStdGen seed
         (w1, ys, r1) = retrieveElement r0 allPositions
         (w2, _, _) = retrieveElement r1 ys
-     in (p2, Player {card = c, tokens = Just (w1, w2)})
+     in (w1, w2)
 -- Strategy 1: fixed position
-findStartingPlayer1 strategy _ (Player {card = c}, p2@Player {card = _})
-  | strategy == 1 = (p2, Player {card = c, tokens = Just ((4, 4), (5, 5))})
+findStartingPlayer1 strategy _ _ | strategy == 1 = ((4, 4), (5, 5))
 findStartingPlayer1 _ _ _ = undefined
 
 player2TableBasis :: Map Workers Workers
@@ -98,21 +98,16 @@ player2Table = (update swap . update syms') player2TableBasis
     syms' (w1, w2) = zip (syms w1) (syms w2)
     swap (w1, w2) = [(w2, w1)]
 
-getRandomPositions :: Int -> Workers -> Workers
-getRandomPositions seed (u1, u2) =
-  let r0 = mkStdGen seed
-      xs = Set.delete u2 (Set.delete u1 allPositions)
-      (w1, ys, r1) = retrieveElement r0 xs
-      (w2, _, _) = retrieveElement r1 ys
-   in (w1, w2)
-
-findStartingPlayer2 :: Int -> Int -> Players -> Players
+findStartingPlayer2 :: Int -> Int -> Workers -> Maybe (Card, Card) -> Workers
 -- Strategy 0: random
-findStartingPlayer2 strategy seed (Player {card = c}, p1@Player {card = _, tokens = Just us})
-  | strategy == 0 = (p1, Player {card = c, tokens = Just (getRandomPositions seed us)})
+findStartingPlayer2 strategy seed (u1, u2) _
+  | strategy == 0 =
+    let r0 = mkStdGen seed
+        xs = Set.delete u2 (Set.delete u1 allPositions)
+        (w1, ys, r1) = retrieveElement r0 xs
+        (w2, _, _) = retrieveElement r1 ys
+     in (w1, w2)
 -- Strategy 1: predetermined position
-findStartingPlayer2 strategy seed (Player {card = c}, p1@Player {card = _, tokens = Just ws})
-  | strategy == 1 =
-    let ww = Map.findWithDefault (getRandomPositions seed ws) ws player2Table
-     in (p1, Player {card = c, tokens = Just ww})
-findStartingPlayer2 _ _ _ = undefined
+findStartingPlayer2 strategy seed ws c
+  | strategy == 1 = Map.findWithDefault (findStartingPlayer2 0 seed ws c) ws player2Table
+findStartingPlayer2 _ _ _ _ = undefined

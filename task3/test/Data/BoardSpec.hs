@@ -88,7 +88,10 @@ spec = do
               "{\"players\":[{\"card\":\"Artemis\"},{\"card\":\"Prometheus\",\"tokens\":[[2,3],[4,4]]}]," -- missing
                 ++ "\"spaces\":[[0,0,0,0,2],[1,1,2,0,0],[1,0,0,3,0],[0,0,3,0,0],[0,0,0,1,4]],"
                 ++ "\"turn\":18}",
-              "{\"players\":[{\"card\":\"Artemis\"},{\"card\":\"Prometheus\"}]," -- missing
+              "{\"players\":[{\"card\":\"Artemis\"},{\"card\":\"Prometheus\"}]," -- missing tokens
+                ++ "\"spaces\":[[0,0,0,0,2],[1,1,2,0,0],[1,0,0,3,0],[0,0,3,0,0],[0,0,0,1,4]],"
+                ++ "\"turn\":18}",
+              "{\"players\":[{\"tokens\":[[2,3],[4,4]]},{\"card\":\"Prometheus\",\"tokens\":[[2,5],[3,5]]}],"  -- missing card
                 ++ "\"spaces\":[[0,0,0,0,2],[1,1,2,0,0],[1,0,0,3,0],[0,0,3,0,0],[0,0,0,1,4]],"
                 ++ "\"turn\":18}",
               "{\"players\":[{\"card\":\"Artemis\",\"tokens\":[[2,3],[4,4]]},{\"card\":\"Prometheus\",\"tokens\":[[2,5],[0,4]]}]," -- out of range
@@ -124,6 +127,7 @@ spec = do
       readBoard (ss !! 7) `shouldBe` Nothing
       readBoard (ss !! 8) `shouldBe` Nothing
       readBoard (ss !! 9) `shouldBe` Nothing
+      readBoard (ss !! 10) `shouldBe` Nothing
 
   it "succeeds with valid input" $ do
     let ss =

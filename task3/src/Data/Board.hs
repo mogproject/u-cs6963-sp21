@@ -31,7 +31,7 @@ import Data.List.Split (chunksOf)
 import qualified Data.Map
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.String.Conversions (cs)
-import GHC.Generics ( Generic )
+import GHC.Generics (Generic)
 import Test.QuickCheck (Arbitrary, Gen, arbitrary, chooseInt, shuffle, vectorOf)
 
 -- dimension

@@ -1,12 +1,13 @@
 import Data.Aeson (encode)
-import Data.Board (Player (Player), card, readBoard, readPlayers, tokens)
+import qualified Data.Board as B
+import qualified Data.BoardWithoutCard as B'
 import Data.Maybe (fromMaybe)
 import Data.String.Conversions (cs)
-import Game.GameState (fromBoard, makeMove, toBoard)
+import Game.GameState (fromBoard, fromBoardWithoutCard, makeMove, toBoard, toBoardWithoutCard)
 import Search.Initial (findStartingPlayer1, findStartingPlayer2)
 import Search.Search (findMove)
 import System.Environment (getArgs, getProgName)
-import System.IO
+import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 import Text.Read (readMaybe)
 
 -- | Entry point of the program.
@@ -44,12 +45,27 @@ usage p =
 
 processLine :: Int -> Int -> String -> String
 processLine s lineNo line = case lineNo of
-  0 -> case readPlayers line of
-    Just p@(Player {tokens = Nothing}, Player {tokens = Nothing}) -> cs . encode $ findStartingPlayer1 1 s p
-    Just p@(Player {tokens = Nothing}, Player {tokens = Just _}) -> cs . encode $ findStartingPlayer2 1 s p
-    _ -> "unexpected input"
-  _ -> case readBoard line of
+  0 -> case B.readPlayers line of
+    Just (B.Player {B.card = c1, B.tokens = Nothing}, p2@B.Player {B.card = c2, B.tokens = Nothing}) ->
+      -- Player 1 with card
+      cs . encode $ (p2, B.Player {B.card = c1, B.tokens = Just $ findStartingPlayer1 1 s (Just (c1, c2))})
+    Just (B.Player {B.card = c1, B.tokens = Nothing}, p2@B.Player {B.card = c2, B.tokens = Just ws}) ->
+      -- Player 2 with card
+      cs . encode $ (p2, B.Player {B.card = c1, B.tokens = Just $ findStartingPlayer2 1 s ws (Just (c1, c2))})
+    _ -> case B'.readPlayers line of
+      -- Player 1 without card
+      Just [] -> cs . encode $ [findStartingPlayer1 1 s Nothing]
+      -- Player 2 without card
+      Just [p] -> cs . encode $ [p, findStartingPlayer2 1 s p Nothing]
+      _ -> "unexpected input"
+  _ -> case B.readBoard line of
     Just b ->
+      -- Board with card
       let st = fromBoard b
-       in cs . encode . toBoard . makeMove st $ findMove 3 s st
-    _ -> "unexpected input"
+       in cs . encode . toBoard . makeMove st $ findMove 2 s st
+    _ -> case B'.readBoard line of
+      Just b ->
+        -- Board without card
+        let st = fromBoardWithoutCard b
+         in cs . encode . toBoardWithoutCard . makeMove st $ findMove 2 s st
+      _ -> "unexpected input"

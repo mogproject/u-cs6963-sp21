@@ -152,7 +152,7 @@ spec = do
       let b52 = fromBoard (fromMaybe undefined (readBoard s52))
       let b52' = makeMove b52 50415
 
-      let s53 = "{\"players\":[{\"card\":\"Atlas\",\"tokens\":[[2,2],[4,2]]},{\"card\":\"Prometheus\",\"tokens\":[[4,4],[4,5]]}],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,2]],\"turn\":3}"
+      let s53 = "{\"players\":[{\"card\":\"Prometheus\",\"tokens\":[[2,2],[4,2]]},{\"card\":\"Atlas\",\"tokens\":[[4,4],[4,5]]}],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,2]],\"turn\":3}"
       let b53 = fromBoard (fromMaybe undefined (readBoard s53))
 
       toBoard b52' `shouldBe` toBoard b53

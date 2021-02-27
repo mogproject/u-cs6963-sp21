@@ -18,7 +18,7 @@ data Card
   | Minotaur
   | Pan
   | Prometheus
-  deriving (Enum, Show, Eq)
+  deriving (Enum, Show, Ord, Eq)
 
 instance FromJSON Card where
   parseJSON =
