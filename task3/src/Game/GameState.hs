@@ -30,7 +30,7 @@ import Data.Board (Board (Board), Level, Player (Player))
 import qualified Data.Board
 import qualified Data.BoardWithoutCard
 import Data.Card (Card (Apollo, Artemis, Atlas, Demeter, Hephastus, Minotaur, Pan, Prometheus))
-import Data.List (tails)
+import Data.List (sort, tails)
 import Data.Map (Map, (!))
 import qualified Data.Map
 import Data.Maybe (fromMaybe)
@@ -264,7 +264,7 @@ getLegalBuildAt (Just Hephastus) lv adjB emptySpace _ mt =
 getLegalBuildAt (Just Prometheus) lv adjB emptySpace mf mt
   | (lv ! mf) >= (lv ! mt) =
     let secondBuild = toList $ (adjB ! mt) .&. emptySpace
-        firstBuild = toList $ (adjB ! mf) .&. emptySpace .&. (complement (1 `shift` mt))
+        firstBuild = toList $ (adjB ! mf) .&. emptySpace .&. complement (1 `shift` mt)
      in [ if x == y then [(x, (lv ! x) + 2)] else [(x, (lv ! x) + 1), (y, (lv ! y) + 1)]
           | x <- secondBuild,
             y <- firstBuild,
@@ -279,7 +279,7 @@ getLegalBuildAt _ lv adjB emptySpace _ mt = [[(bl, (lv ! bl) + 1)] | bl <- toLis
 --------------------------------------------------------------------------------
 
 getLegalMoves :: Cards -> Players -> Levels -> LevelMap -> AdjList -> AdjList -> [GameMove]
-getLegalMoves (c1, _) pl lv lm adjM adjB = do
+getLegalMoves (c1, _) pl lv lm adjM adjB = sort $ do
   wk <- [0, 1]
   let mf = pl !! 0 !! wk -- move from
   let mfl = lv ! mf -- move from level
@@ -302,10 +302,11 @@ getLegalMoves (c1, _) pl lv lm adjM adjB = do
 
   -- check point 1
   let moveSofar = (applyPushTo . applyDoubleMove . setMoveToLevel mtl . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
-  let emptySofar = emptySpace .|. (fromMaybe 0 (fmap (\(_, pushTo) -> 1 `shift` pushTo) pushInfo))
+  let emptySofar = emptySpace .&. (complement (fromMaybe 0 (fmap (\(_, pushTo) -> 1 `shift` pushTo) pushInfo)))
 
   -- check winning
-  if (mfl == 2 && mtl == 3) || (Pan `elem` c1 && mtl + 2 <= mfl)
+  -- Note: it's possible for Artemis to win by moving from level 1
+  if (mfl < 3 && mtl == 3) || (Pan `elem` c1 && mtl + 2 <= mfl)
     then return $ setWin moveSofar
     else do
       -- move to (second)

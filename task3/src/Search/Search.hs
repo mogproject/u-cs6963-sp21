@@ -57,7 +57,7 @@ searchAlphaBetaNaive' g@GameState {GS.legalMoves = mv} depth alpha beta shouldMa
     (Just sc, Just m) -> ((if shouldMaximize then 1 else -1) * sc, m : sofar) -- terminal node
     (Nothing, _) ->
       let nextStates = fmap (makeMove g) mv
-          bestScore = if shouldMaximize then (- scoreWin - 1) else (scoreWin + 1)
+          bestScore = if shouldMaximize then - scoreWin - 1 else scoreWin + 1
        in searchAlphaBetaNaive'' (zip mv nextStates) depth alpha beta shouldMaximize sofar (bestScore, [])
 
 searchAlphaBetaNaive'' :: [(GameMove, GameState)] -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove]) -> (Score, [GameMove])
@@ -91,7 +91,7 @@ searchAlphaBetaReordering' g@GameState {GS.legalMoves = mv} depth alpha beta sho
     (Nothing, _) ->
       -- FIXME: cache evaluation results
       let nextStates = sortBy (comparing ((if shouldMaximize then negate else id) . fst)) [(evaluate st, (m, st)) | m <- mv, let st = makeMove g m]
-          bestScore = if shouldMaximize then (- scoreWin - 1) else (scoreWin + 1)
+          bestScore = if shouldMaximize then - scoreWin - 1 else scoreWin + 1
        in searchAlphaBetaReordering'' (map snd nextStates) depth alpha beta shouldMaximize sofar (bestScore, [])
 
 searchAlphaBetaReordering'' :: [(GameMove, GameState)] -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove]) -> (Score, [GameMove])

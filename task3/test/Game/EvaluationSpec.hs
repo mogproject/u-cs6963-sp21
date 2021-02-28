@@ -11,7 +11,7 @@ import Data.Ord (comparing)
 import Game.Evaluation
   ( evaluate,
     evaluateAsymmetry',
-    -- evaluatePrevention',
+    evaluatePrevention',
     evaluateReachability',
     -- evaluateStuckBonus',
     evaluateWorkerProximity',
