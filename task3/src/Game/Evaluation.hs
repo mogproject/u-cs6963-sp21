@@ -220,7 +220,11 @@ evaluateStuckBonus pl adj p = sum [if adj ! (pl !! (1 - p) !! w) == 0 then evalS
 evaluatePrevention :: Players -> Levels -> AdjList -> [V.Vector Int] -> Int -> Score
 evaluatePrevention pl lv adj dist p = sum [f index | w <- [0, 1], let index = pl !! p !! w, lv ! index == 2]
   where
-    f index = if minimum [dist !! (1 - p) V.! u | u <- toList (adj ! index)] >= 2 then evalPreventionAdvantage else 0
+    f index =
+      let nbrs = adj ! index
+       in if nbrs > 0 && minimum [dist !! (1 - p) V.! u | u <- toList nbrs] >= 2
+            then evalPreventionAdvantage
+            else 0
 
 --------------------------------------------------------------------------------
 -- For unit testing
