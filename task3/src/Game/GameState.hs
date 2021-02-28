@@ -44,7 +44,7 @@ type Index = Int -- 0 (row=1, col=1), 1 (row=1, col=2), ..., 24 (row=5, col=5)
 
 type WorkerId = Int -- 0 or 1
 
-type Cards = (Maybe Card, Maybe Card)
+type Cards = [Maybe Card]
 
 type Players = [[Index]]
 
@@ -104,7 +104,7 @@ fromIndex i = (i `div` 5 + 1, i `mod` 5 + 1)
 
 fromBoard' :: Maybe Card -> Maybe Card -> Data.Board.Workers -> Data.Board.Workers -> [[Data.Board.Level]] -> Int -> GameState
 fromBoard' c1 c2 (w1, w2) (w3, w4) sp t =
-  let cs = (c1, c2)
+  let cs = [c1, c2]
       pl = [[toIndex w1, toIndex w2], [toIndex w3, toIndex w4]]
       lv = Data.Map.fromList . zip [0 .. 24] $ concat sp
       lm = createLevelMap lv
@@ -131,7 +131,7 @@ fromBoardWithoutCard Data.BoardWithoutCard.Board {Data.BoardWithoutCard.players 
 fromBoardWithoutCard _ = undefined
 
 toBoard :: GameState -> Board
-toBoard GameState {cards = (Just c1, Just c2), players = [[w1, w2], [w3, w4]], levels = lv, turn = t} =
+toBoard GameState {cards = [Just c1, Just c2], players = [[w1, w2], [w3, w4]], levels = lv, turn = t} =
   let pl =
         ( Player {Data.Board.card = c1, Data.Board.tokens = Just (fromIndex w1, fromIndex w2)},
           Player {Data.Board.card = c2, Data.Board.tokens = Just (fromIndex w3, fromIndex w4)}
@@ -249,7 +249,7 @@ getLegalBuildAt (Just Atlas) lv adjB emptySpace _ mt =
 -- as the first build within a turn.
 getLegalBuildAt (Just Demeter) lv adjB emptySpace _ mt =
   let cand = toList $ (adjB ! mt) .&. emptySpace
-      comb = [[x] | x <- cand] ++ (combinations 2 cand)
+      comb = [[x] | x <- cand] ++ combinations 2 cand
    in [[(x, (lv ! x) + 1) | x <- xs] | xs <- comb]
 --
 -- [Hephastus]
@@ -281,7 +281,7 @@ getLegalBuildAt _ lv adjB emptySpace _ mt = [[(bl, (lv ! bl) + 1)] | bl <- toLis
 --------------------------------------------------------------------------------
 
 getLegalMoves :: Cards -> Players -> Levels -> LevelMap -> AdjList -> AdjList -> [GameMove]
-getLegalMoves (c1, _) pl lv lm adjM adjB = sort $ do
+getLegalMoves (c1 : _) pl lv lm adjM adjB = sort $ do
   wk <- [0, 1]
   let mf = pl !! 0 !! wk -- move from
   let mfl = lv ! mf -- move from level
@@ -300,11 +300,11 @@ getLegalMoves (c1, _) pl lv lm adjM adjB = sort $ do
 
   -- push to
   let pushInfo = getLegalPushTo c1 pl mf mt
-  let applyPushTo = fromMaybe id $ fmap (\(owid, pushTo) -> setOpponentMove owid pushTo) pushInfo
+  let applyPushTo = maybe id (uncurry setOpponentMove) pushInfo
 
   -- check point 1
   let moveSofar = (applyPushTo . applyDoubleMove . setMoveToLevel mtl . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
-  let emptySofar = emptySpace .&. (complement (fromMaybe 0 (fmap (\(_, pushTo) -> 1 `shift` pushTo) pushInfo)))
+  let emptySofar = emptySpace .&. complement (maybe 0 (\(_, pushTo) -> 1 `shift` pushTo) pushInfo)
 
   -- check winning
   -- Note: it's possible for Artemis to win by moving from level 1
@@ -315,16 +315,17 @@ getLegalMoves (c1, _) pl lv lm adjM adjB = sort $ do
       bls <- getLegalBuildAt c1 lv adjB emptySofar mf mt
 
       -- check point 2
-      let moveSofar' = (setBuildAt bls) moveSofar
+      let moveSofar' = setBuildAt bls moveSofar
 
       -- move evaluation
       -- TODO: Implement
       return moveSofar'
+getLegalMoves _ _ _ _ _ _ = undefined
 
 makeMove :: GameState -> GameMove -> GameState
 makeMove
   GameState
-    { cards = (c1, c2),
+    { cards = [c1, c2],
       players = [p1, p2],
       levels = lv,
       turn = t,
@@ -344,11 +345,11 @@ makeMove
         t' = t + 1
 
         -- cards
-        cs' = (c2, c1)
+        cs' = [c2, c1]
 
         -- players
-        p1' = [if wk == i then mt else (p1 !! i) | i <- [0, 1]]
-        p2' = [if owid == i then omt else (p2 !! i) | i <- [0, 1]]
+        p1' = [if wk == i then mt else p1 !! i | i <- [0, 1]]
+        p2' = [if owid == i then omt else p2 !! i | i <- [0, 1]]
         pl' = [p2', p1']
 
         (lv', lm', adjM', adjB') =
@@ -367,11 +368,11 @@ makeMove
                     -- update adjacency lists
                     addArc m =
                       if prevLevel <= 1 -- add arc: bl -> high N(bl)
-                        then Data.Map.adjust (.|. ((defaultNeighbors V.! bl) .&. (g (prevLevel + 2) (min 3 (nextLevel + 1))))) bl m
+                        then Data.Map.adjust (.|. ((defaultNeighbors V.! bl) .&. g (prevLevel + 2) (min 3 (nextLevel + 1)))) bl m
                         else m
                     removeArc m =
                       if nextLevel >= 2 -- remove arc: low N(bl) -> bl
-                        then foldl (flip f) m (toList ((defaultNeighbors V.! bl) .&. (g (max 0 (prevLevel - 1)) (nextLevel - 2))))
+                        then foldl (flip f) m (toList ((defaultNeighbors V.! bl) .&. g (max 0 (prevLevel - 1)) (nextLevel - 2)))
                         else m
 
                     xadjM'

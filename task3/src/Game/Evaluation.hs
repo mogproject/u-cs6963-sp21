@@ -146,18 +146,18 @@ bfs' adj avail q sofar =
    in bfs' adj avail q' sofar'
 
 getDistances :: Cards -> Players -> AdjList -> ([[Map Index Int]], [V.Vector Int])
-getDistances (c1, c2) pl adjM =
+getDistances cs pl adjM =
   let ps = [fromList ws | ws <- pl] -- player bitmaps
-      f p = any (\x -> x `elem` (if p == 0 then c1 else c2)) [Apollo, Minotaur]
+      f p = any (\x -> x `elem` (cs !! p)) [Apollo, Minotaur] -- those gods ignore opponent's positions
       obstacles = [if f p then 0 else ps !! (1 - p) | p <- [0, 1]]
-      dist = [[bfs adjM (complement (obstacles !! p)) (pl !! p !! w) | w <- [0, 1]] | p <- [0, 1]]
+      dist' = [[bfs adjM (complement (obstacles !! p)) (pl !! p !! w) | w <- [0, 1]] | p <- [0, 1]]
+      dist = [if Artemis `elem` (cs !! p) then [Data.Map.map (\x -> (x + 1) `div` 2) (dist' !! p !! w) | w <- [0, 1]] else dist' !! p | p <- [0, 1]]
       bestDist = [V.fromList [minimum [dist !! p !! w ! i | w <- [0, 1]] | i <- [0 .. 24]] | p <- [0, 1]]
    in (dist, bestDist)
 
 --------------------------------------------------------------------------------
 -- Logic
 --------------------------------------------------------------------------------
--- TODO: halve the distance if the card is Artemis
 evaluate :: GameState -> Score
 evaluate
   g@GameState
@@ -228,7 +228,7 @@ evaluatePrevention pl lv adj dist p = sum [f index | w <- [0, 1], let index = pl
 -- (6) Pan's Level 2 Bonus
 evaluatePanBonus :: Cards -> Players -> Levels -> Int -> Score
 evaluatePanBonus cs pl lv p =
-  if Pan `elem` (if p == 0 then fst else snd) cs
+  if Pan `elem` (cs !! p)
     then sum [if lv ! w == 2 then evalPanBonus else 0 | w <- pl !! p]
     else 0
 
