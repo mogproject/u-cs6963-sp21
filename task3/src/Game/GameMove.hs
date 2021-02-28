@@ -8,6 +8,7 @@ module Game.GameMove
     setMoveTo,
     getMoveTo,
     setWin,
+    getWin,
     setMoveToLevel,
     setOpponentMove,
     getOpponentMove,
@@ -93,6 +94,9 @@ getOpponentMove x =
 
 setWin :: Int64 -> Int64
 setWin = setValue 46 1 0
+
+getWin :: Int64 -> Bool
+getWin x = getValue 46 1 x == 0
 
 setDoubleMove :: Int64 -> Int64
 setDoubleMove = setValue 33 1 0
