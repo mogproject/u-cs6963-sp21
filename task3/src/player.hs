@@ -60,6 +60,7 @@ processLine s lineNo line = case lineNo of
       _ -> "unexpected input"
   _ -> case B.readBoard line of
     Just b ->
+      -- TODO: Refactor logic.
       -- Board with card
       let st = fromBoard b
        in cs . encode . toBoard . makeMove st $ findMove 2 s st

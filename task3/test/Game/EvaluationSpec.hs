@@ -1,26 +1,5 @@
 module Game.EvaluationSpec (spec) where
 
--- Board (Board),
--- Players,
--- choosePlayers,
--- players,
-
--- readPlayers,
--- spaces,
--- turn,
-
--- writePlayers,
-
---  GameMove,
--- GameState (GameState),
--- evaluate,
-
--- levels,
-
--- players,
--- toBoard,
--- turn,`
-
 -- import Control.Monad
 import Data.Board
   ( readBoard,
@@ -37,15 +16,17 @@ import Game.Evaluation
     -- evaluateStuckBonus',
     evaluateWorkerProximity',
   )
+
+import Game.GameMove
 import Game.GameState
-  ( --  decodeMove,
-    fromBoard,
+  ( fromBoard,
     legalMoves,
     makeMove,
     toBoard,
   )
 import Test.Hspec
-import Test.Hspec.QuickCheck
+import Test.Hspec.QuickCheck (prop)
+
 -- import Test.QuickCheck
 
 eval :: String -> Int
@@ -150,7 +131,9 @@ spec = do
     it "makeMove should not affect the evaluation" $ do
       let s52 = "{\"players\":[{\"card\":\"Atlas\",\"tokens\":[[4,4],[5,4]]},{\"card\":\"Prometheus\",\"tokens\":[[2,2],[4,2]]}],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,1]],\"turn\":2}"
       let b52 = fromBoard (fromMaybe undefined (readBoard s52))
-      let b52' = makeMove b52 50415
+
+      -- worker 2, (5,4) -> (4,5) build (5,5)
+      let b52' = makeMove b52 $ (setWorkerId 1 . setMoveFrom 23 . setMoveTo 19 . setBuildAt [(24, 2)]) createGameMove
 
       let s53 = "{\"players\":[{\"card\":\"Prometheus\",\"tokens\":[[2,2],[4,2]]},{\"card\":\"Atlas\",\"tokens\":[[4,4],[4,5]]}],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,2]],\"turn\":3}"
       let b53 = fromBoard (fromMaybe undefined (readBoard s53))
@@ -164,10 +147,11 @@ spec = do
       let state = fromBoard b
           moves = legalMoves state
           nextStates = [makeMove state m | m <- moves]
-       in -- do
-          --  print $ head moves
-          --  (fromBoard . toBoard) (head nextStates) `shouldBe` (head nextStates)
-          foldl
-            (\_ x -> (fromBoard . toBoard) x `shouldBe` x)
-            (True `shouldBe` True)
-            nextStates
+       in do
+            -- print state
+            -- print $ head moves
+            --  (fromBoard . toBoard) (head nextStates) `shouldBe` (head nextStates)
+            foldl
+              (\_ x -> (fromBoard . toBoard) x `shouldBe` x)
+              (True `shouldBe` True)
+              nextStates

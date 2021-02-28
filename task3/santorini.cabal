@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 92449705bb30b2d07ae4e8aa5c314f7962950582dadadb2c01c2c79750bc218a
+-- hash: 5f5fac44a8cbb01799b82e157ad969a73bad774d2c773f5739ad9c888f7b867f
 
 name:           santorini
 version:        0.1.0
@@ -76,10 +76,12 @@ test-suite santorini-test
       Data.BoardSpec
       Data.BoardWithoutCardSpec
       Game.EvaluationSpec
+      Game.GameMoveSpec
       Search.InitialSpec
       Data.BoardSpec
       Data.BoardWithoutCardSpec
       Game.EvaluationSpec
+      Game.GameMoveSpec
       Main
       Search.InitialSpec
       Paths_santorini

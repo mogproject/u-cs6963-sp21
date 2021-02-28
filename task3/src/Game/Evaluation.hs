@@ -17,16 +17,15 @@ import qualified Data.Map
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Vector.Unboxed as V
+import Game.GameMove
 import Game.GameState
   ( AdjList,
     Bitmap,
     GameState (GameState),
-    GameMove,
     Index,
     Levels,
     Players,
     buildAdjacency,
-    decodeMove,
     fromList,
     legalMoves,
     levelMap,
@@ -150,7 +149,7 @@ getDistances pl adjM =
 --------------------------------------------------------------------------------
 -- Logic
 --------------------------------------------------------------------------------
-
+-- TODO: halve the distance if the card is Artemis
 evaluate :: GameState -> Score
 evaluate
   g@GameState
@@ -186,7 +185,7 @@ evaluate'
       legalMoves = mv
     }
     | opponentWin = (Just (- scoreWin), Nothing)
-    | canWin = (Just scoreWin, Just (head [m | m <- mv, let (_, _, mt, _) = decodeMove m, lv ! mt == 3]))
+    | canWin = (Just scoreWin, Just (head [m | m <- mv, let mt = getMoveTo m, lv ! mt == 3]))
     | otherwise = (Nothing, Nothing)
     where
       -- FIXME: when cards are introduced
