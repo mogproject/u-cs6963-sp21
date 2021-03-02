@@ -9,6 +9,8 @@ module Game.BitBoard
     countBB,
     getNeighborhood,
     getClosedNeighborhood,
+    isValidIndex,
+    getPointSymmetricIndex,
   ) 
 where
 
@@ -27,6 +29,7 @@ import Data.Bits (shift, (.&.), (.|.), popCount, xor, countTrailingZeros)
 --  4         28 |29  30  31  32  33| 34
 --  5         35 |36  37  38  39  40| 41
 --               --------------------
+--            42  43  44  45  46  47  48
 
 type Index = Int
 type BitBoard = Int64
@@ -36,6 +39,12 @@ rcToIndex r c = 7 * r + c
 
 elemBB :: Index -> BitBoard -> Bool
 elemBB i bb = (bb `shift` (- i)) .&. 1 == 1
+
+isValidIndex :: Index -> Bool
+isValidIndex i = elemBB i globalMask
+
+getPointSymmetricIndex :: Index -> Index -> Index
+getPointSymmetricIndex center i = center * 2 - i
 
 bbToList :: BitBoard -> [Index]
 bbToList bb = tail . map fst $ takeWhile ((/= -1) . fst) $ iterate f (0, bb)
@@ -47,15 +56,15 @@ bbToList bb = tail . map fst $ takeWhile ((/= -1) . fst) $ iterate f (0, bb)
           let p = countTrailingZeros y
            in (p, y `xor` (1 `shift` p))
 
+listToBB :: [Int] -> BitBoard
+listToBB = sum . map singletonBB
+
 -- it is user's responsibility to keep bits clean
 countBB :: BitBoard -> Int
 countBB = popCount
 
 singletonBB :: Int -> BitBoard
 singletonBB i = 1 `shift` i
-
-listToBB :: [Int] -> BitBoard
-listToBB = sum . map singletonBB
 
 -- mask of valid bits (should be 2147077824256)
 globalMask :: BitBoard

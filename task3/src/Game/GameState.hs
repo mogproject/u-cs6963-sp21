@@ -24,6 +24,7 @@ module Game.GameState
     AdjList,
     toList,
     fromList,
+    getLegalMoveTo,
   )
 where
 
@@ -186,15 +187,15 @@ createBuildAdjacencyList lv lm = Data.Map.fromList [(i, if lv ! i == 4 then 0 el
 --------------------------------------------------------------------------------
 -- Move to
 --------------------------------------------------------------------------------
-getLegalMoveTo :: Maybe Card -> Index -> Level -> LevelMap -> Bitmap -> Bitmap -> Bitmap -> AdjList -> [Index]
+getLegalMoveTo :: Maybe Card -> Index -> LevelMap -> Bitmap -> Bitmap -> Bitmap -> AdjList -> [Index]
 --
 -- [Artemis]
 -- The moved token can optionally move a second time (i.e., the same token),
 -- as long as the first move doesn’t win, and as long as the second move doesn’t return
 -- to the original space.
-getLegalMoveTo (Just Artemis) mf mfl lm _ allWorkers _ adjM =
+getLegalMoveTo (Just Artemis) mf lm _ allWorkers _ adjM =
   let firstMove = (adjM ! mf) .&. complement allWorkers
-      secondMoveFrom = (if mfl == 2 then (complement (lm ! 3) .&.) else id) firstMove
+      secondMoveFrom = (if mf `bitElem` (lm ! 2) then (complement (lm ! 3) .&.) else id) firstMove
    in toList $ foldl (\z x -> z .|. adjM ! x) firstMove (toList secondMoveFrom) .&. complement allWorkers
 --
 -- [Minotaur]
@@ -202,19 +203,19 @@ getLegalMoveTo (Just Artemis) mf mfl lm _ allWorkers _ adjM =
 -- but only if the token can be pushed back to an unoccupied space, and only as long as
 -- the token would be able to move to the opponent’s space if the opponent token were not there.
 -- The unoccupied space where the opponent’s token is pushed can be at any level less than 4.
-getLegalMoveTo (Just Minotaur) mf _ _ friend _ emptySpace adjM =
+getLegalMoveTo (Just Minotaur) mf _ friend _ emptySpace adjM =
   let candidates = (adjM ! mf) .&. complement friend
       isValidPushTo pt = pt /= -1 && pt `bitElem` emptySpace
-   in filter (isValidPushTo . lookupPushTo mf) (toList candidates)
+   in filter (\x -> x `bitElem` emptySpace || (isValidPushTo . lookupPushTo mf) x) (toList candidates)
 --
 -- [Apollo]
 -- A token’s move can optionally swap places with an adjacent opponent token,
 -- as long as the token would be able to move to the opponent’s space if the
 -- opponent token were not there; otherwise, the move must be to an unoccupied space as usual.
-getLegalMoveTo (Just Apollo) mf _ _ friend _ _ adjM = toList $ (adjM ! mf) .&. complement friend
+getLegalMoveTo (Just Apollo) mf _ friend _ _ adjM = toList $ (adjM ! mf) .&. complement friend
 --
 -- Others.
-getLegalMoveTo _ mf _ _ _ allWorkers _ adjM = toList $ (adjM ! mf) .&. complement allWorkers
+getLegalMoveTo _ mf _ _ allWorkers _ adjM = toList $ (adjM ! mf) .&. complement allWorkers
 
 --------------------------------------------------------------------------------
 -- Push to
@@ -285,7 +286,6 @@ getLegalMoves effectiveOnly (c1 : _) pl lv lm adjM adjB =
   let allMoves = do
         wk <- [0, 1]
         let mf = pl !! 0 !! wk -- move from
-        let mfl = lv ! mf -- move from level
 
         -- bitmaps
         let opponentWorkers = sum [1 `shift` x | x <- pl !! 1] :: Int
@@ -295,8 +295,7 @@ getLegalMoves effectiveOnly (c1 : _) pl lv lm adjM adjB =
         let emptySpace = ((1 `shift` 25) - 1) .&. complement ((lm ! 4) .|. otherWorkers) :: Bitmap
 
         -- move to
-        mt <- getLegalMoveTo c1 mf mfl lm friendWorker allWorkers emptySpace adjM
-        let mtl = lv ! mt -- move to level
+        mt <- getLegalMoveTo c1 mf lm friendWorker allWorkers emptySpace adjM
         let applyDoubleMove = if mt `bitElem` (adjM ! mf) then id else setDoubleMove
 
         -- push to
@@ -304,13 +303,13 @@ getLegalMoves effectiveOnly (c1 : _) pl lv lm adjM adjB =
         let applyPushTo = maybe id (uncurry setOpponentMove) pushInfo
 
         -- check point 1
-        let moveSofar = (applyPushTo . applyDoubleMove . setMoveToLevel mtl . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
+        let moveSofar = (applyPushTo . applyDoubleMove . setMoveToLevel (lv ! mt) . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
         let emptySofar = emptySpace .&. complement (maybe 0 (\(_, pushTo) -> 1 `shift` pushTo) pushInfo)
 
         -- check winning
         -- Note: it's possible for Artemis to win by moving like 1->2->3 or 3->2->3
         if isWinningMove c1 mf mt lv lm
-          then -- TODO: implement early return (finding one move is enough)
+          then
             return $ setWin moveSofar
           else do
             -- build at
@@ -324,7 +323,7 @@ getLegalMoves effectiveOnly (c1 : _) pl lv lm adjM adjB =
             return moveSofar'
    in if effectiveOnly
         then case find getWin allMoves of
-          Just m -> [m]  -- one winning move is enough
+          Just m -> [m] -- one winning move is enough
           Nothing -> sort allMoves
         else sort allMoves
 getLegalMoves _ _ _ _ _ _ _ = undefined
