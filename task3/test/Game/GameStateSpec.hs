@@ -33,6 +33,22 @@ getLegalMoveTo' b =
          in getLegalMoveTo (cs !! 0) mf lm friendWorker allWorkers emptySpace adjM
    in [f wk | wk <- [0, 1]]
 
+-- b: board after a move
+getLegalBuildAt' :: B.Board -> Int -> Int -> [[(Index, Int)]]
+getLegalBuildAt' b wk moveFrom =
+  let GameState
+        { cards = cs,
+          players = pl,
+          levels = lv,
+          levelMap = lm,
+          buildAdjacency = adjB
+        } = fromBoard b
+      opponentWorkers = sum [1 `shift` x | x <- pl !! 1] :: Int
+      friendWorker = 1 `shift` (pl !! 0 !! (1 - wk)) :: Int
+      otherWorkers = opponentWorkers .|. friendWorker
+      emptySpace = ((1 `shift` 25) - 1) .&. complement ((lm ! 4) .|. otherWorkers) :: Bitmap
+   in getLegalBuildAt (cs !! 0) lv adjB emptySpace moveFrom (pl !! 0 !! wk)
+
 spec :: Spec
 spec = do
   describe "GameState#getLegalMoves()" $ do
@@ -143,4 +159,305 @@ spec = do
       getLegalMoveTo' b1
         `shouldBe` [ [],
                      [ri 3 1]
+                   ]
+
+  describe "GameState#getLegalBuildAt()" $ do
+    it "works with Atlas" $ do
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Atlas, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Prometheus, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 4, 2, 0],
+                    [2, 4, 2, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b1 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 3, 4)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 4, 4)],
+                     [(ri 1 5, 3)],
+                     [(ri 1 5, 4)],
+                     [(ri 3 3, 3)],
+                     [(ri 3 3, 4)],
+                     [(ri 3 5, 4)]
+                   ]
+    it "works with Demeter" $ do
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Demeter, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Prometheus, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 4, 2, 0],
+                    [2, 4, 2, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b1 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 5, 3)],
+                     [(ri 3 3, 3)],
+                     [(ri 3 5, 4)],
+                     [(ri 1 3, 2), (ri 1 4, 1)],
+                     [(ri 1 3, 2), (ri 1 5, 3)],
+                     [(ri 1 3, 2), (ri 3 3, 3)],
+                     [(ri 1 3, 2), (ri 3 5, 4)],
+                     [(ri 1 4, 1), (ri 1 5, 3)],
+                     [(ri 1 4, 1), (ri 3 3, 3)],
+                     [(ri 1 4, 1), (ri 3 5, 4)],
+                     [(ri 1 5, 3), (ri 3 3, 3)],
+                     [(ri 1 5, 3), (ri 3 5, 4)],
+                     [(ri 3 3, 3), (ri 3 5, 4)]
+                   ]
+
+    it "works with Hephastus" $ do
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Hephastus, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Prometheus, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 4, 2, 0],
+                    [2, 4, 2, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b1 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 3, 3)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 4, 2)],
+                     [(ri 1 5, 3)],
+                     [(ri 3 3, 3)],
+                     [(ri 3 5, 4)]
+                   ]
+
+    it "works with Prometheus" $ do
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Prometheus, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Pan, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 2, 2, 0],
+                    [2, 4, 2, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b1 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 5, 3)],
+                     [(ri 2 3, 3)],
+                     [(ri 3 3, 3)],
+                     [(ri 3 5, 4)],
+                     [(ri 1 3, 2), (ri 2 2, 2)],
+                     [(ri 1 3, 2), (ri 2 3, 3)],
+                     [(ri 1 4, 1), (ri 2 2, 2)],
+                     [(ri 1 4, 1), (ri 2 3, 3)],
+                     [(ri 1 5, 3), (ri 2 2, 2)],
+                     [(ri 1 5, 3), (ri 2 3, 3)],
+                     [(ri 2 3, 3), (ri 2 2, 2)],
+                     [(ri 2 3, 4)],
+                     [(ri 3 3, 3), (ri 2 2, 2)],
+                     [(ri 3 3, 3), (ri 2 3, 3)],
+                     [(ri 3 5, 4), (ri 2 2, 2)],
+                     [(ri 3 5, 4), (ri 2 3, 3)]
+                   ]
+
+      let b2 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Prometheus, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Atlas, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 2, 2, 0],
+                    [2, 4, 1, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b2 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 5, 3)],
+                     [(ri 2 3, 3)],
+                     [(ri 3 3, 2)],
+                     [(ri 3 5, 4)]
+                   ]
+
+      let b3 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Prometheus, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Pan, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 2, 1, 0],
+                    [2, 4, 2, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b3 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 5, 3)],
+                     [(ri 2 3, 3)],
+                     [(ri 3 3, 3)],
+                     [(ri 3 5, 4)],
+                     [(ri 1 3, 2), (ri 2 2, 2)],
+                     [(ri 1 3, 2), (ri 2 3, 3)],
+                     [(ri 1 3, 2), (ri 2 4, 2)],
+                     [(ri 1 4, 1), (ri 2 2, 2)],
+                     [(ri 1 4, 1), (ri 2 3, 3)],
+                     [(ri 1 4, 1), (ri 2 4, 2)],
+                     [(ri 1 5, 3), (ri 2 2, 2)],
+                     [(ri 1 5, 3), (ri 2 3, 3)],
+                     [(ri 1 5, 3), (ri 2 4, 2)],
+                     [(ri 2 3, 3), (ri 2 2, 2)],
+                     [(ri 2 3, 4)],
+                     [(ri 2 3, 3), (ri 2 4, 2)],
+                     [(ri 3 3, 3), (ri 2 2, 2)],
+                     [(ri 3 3, 3), (ri 2 3, 3)],
+                     [(ri 3 3, 3), (ri 2 4, 2)],
+                     [(ri 3 5, 4), (ri 2 2, 2)],
+                     [(ri 3 5, 4), (ri 2 3, 3)],
+                     [(ri 3 5, 4), (ri 2 4, 2)]
+                   ]
+
+      let b4 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Prometheus, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Pan, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 3, 2, 0],
+                    [2, 4, 2, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b4 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 5, 3)],
+                     [(ri 2 3, 4)],
+                     [(ri 3 3, 3)],
+                     [(ri 3 5, 4)],
+                     [(ri 1 3, 2), (ri 2 2, 2)],
+                     [(ri 1 3, 2), (ri 2 3, 4)],
+                     [(ri 1 4, 1), (ri 2 2, 2)],
+                     [(ri 1 4, 1), (ri 2 3, 4)],
+                     [(ri 1 5, 3), (ri 2 2, 2)],
+                     [(ri 1 5, 3), (ri 2 3, 4)],
+                     [(ri 2 3, 4), (ri 2 2, 2)],
+                     [(ri 3 3, 3), (ri 2 2, 2)],
+                     [(ri 3 3, 3), (ri 2 3, 4)],
+                     [(ri 3 5, 4), (ri 2 2, 2)],
+                     [(ri 3 5, 4), (ri 2 3, 4)]
+                   ]
+
+      let b5 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Prometheus, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Pan, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 2, 0, 0],
+                    [2, 4, 2, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b5 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 5, 3)],
+                     [(ri 2 3, 3)],
+                     [(ri 3 3, 3)],
+                     [(ri 3 5, 4)],
+                     [(ri 1 3, 2), (ri 2 2, 2)],
+                     [(ri 1 3, 2), (ri 2 3, 3)],
+                     [(ri 1 3, 2), (ri 2 4, 1)],
+                     [(ri 1 4, 1), (ri 2 2, 2)],
+                     [(ri 1 4, 1), (ri 2 3, 3)],
+                     [(ri 1 4, 1), (ri 2 4, 1)],
+                     [(ri 1 5, 3), (ri 2 2, 2)],
+                     [(ri 1 5, 3), (ri 2 3, 3)],
+                     [(ri 1 5, 3), (ri 2 4, 1)],
+                     [(ri 2 3, 3), (ri 2 2, 2)],
+                     [(ri 2 3, 4)],
+                     [(ri 2 3, 3), (ri 2 4, 1)],
+                     [(ri 3 3, 3), (ri 2 2, 2)],
+                     [(ri 3 3, 3), (ri 2 3, 3)],
+                     [(ri 3 3, 3), (ri 2 4, 1)],
+                     [(ri 3 5, 4), (ri 2 2, 2)],
+                     [(ri 3 5, 4), (ri 2 3, 3)],
+                     [(ri 3 5, 4), (ri 2 4, 1)]
+                   ]
+
+    it "works with other cards" $ do
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Pan, B.tokens = Just ((2, 4), (2, 5))},
+                    B.Player {B.card = Prometheus, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 1, 0, 2],
+                    [0, 1, 4, 2, 0],
+                    [2, 4, 2, 2, 3],
+                    [0, 4, 4, 3, 3],
+                    [0, 3, 3, 1, 1]
+                  ],
+                B.turn = 0
+              }
+
+      getLegalBuildAt' b1 0 (ri 3 3)
+        `shouldBe` [ [(ri 1 3, 2)],
+                     [(ri 1 4, 1)],
+                     [(ri 1 5, 3)],
+                     [(ri 3 3, 3)],
+                     [(ri 3 5, 4)]
                    ]

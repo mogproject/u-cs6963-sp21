@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-
 module Game.GameState
   ( GameState (GameState),
     GameMove,
@@ -25,6 +23,7 @@ module Game.GameState
     toList,
     fromList,
     getLegalMoveTo,
+    getLegalBuildAt,
   )
 where
 
@@ -36,7 +35,6 @@ import Data.Card (Card (Apollo, Artemis, Atlas, Demeter, Hephastus, Minotaur, Pa
 import Data.List (find, sort, tails)
 import Data.Map (Map, (!))
 import qualified Data.Map
-import Data.Maybe (fromMaybe)
 import qualified Data.Vector.Unboxed as V
 import Game.GameMove
 
@@ -267,12 +265,14 @@ getLegalBuildAt (Just Hephastus) lv adjB emptySpace _ mt =
 getLegalBuildAt (Just Prometheus) lv adjB emptySpace mf mt
   | (lv ! mf) >= (lv ! mt) =
     let secondBuild = toList $ (adjB ! mt) .&. emptySpace
-        firstBuild = toList $ (adjB ! mf) .&. emptySpace .&. complement (1 `shift` mt)
-     in [ if x == y then [(x, (lv ! x) + 2)] else [(x, (lv ! x) + 1), (y, (lv ! y) + 1)]
-          | x <- secondBuild,
-            y <- firstBuild,
-            x /= y || lv ! x <= 2
-        ]
+        forbidden = if (lv ! mf) == (lv ! mt) then complement (1 `shift` mt) else -1
+        firstBuild = toList $ (adjB ! mf) .&. emptySpace .&. forbidden
+     in getLegalBuildAt Nothing lv adjB emptySpace mf mt
+          ++ [ if x == y then [(x, (lv ! x) + 2)] else [(x, (lv ! x) + 1), (y, (lv ! y) + 1)]
+               | x <- secondBuild,
+                 y <- firstBuild,
+                 x /= y || lv ! x <= 2
+             ]
 --
 -- Others.
 getLegalBuildAt _ lv adjB emptySpace _ mt = [[(bl, (lv ! bl) + 1)] | bl <- toList $ (adjB ! mt) .&. emptySpace]
@@ -309,7 +309,7 @@ getLegalMoves effectiveOnly (c1 : _) pl lv lm adjM adjB =
         -- check winning
         -- Note: it's possible for Artemis to win by moving like 1->2->3 or 3->2->3
         if isWinningMove c1 mf mt lv lm
-          then
+          then -- if there is a winning move, do not build (thus, do not generate all moves for Artemis)
             return $ setWin moveSofar
           else do
             -- build at
