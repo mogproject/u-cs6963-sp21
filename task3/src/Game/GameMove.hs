@@ -9,6 +9,8 @@ module Game.GameMove
     getMoveTo,
     setWin,
     getWin,
+    setLose,
+    getLose,
     setMoveToLevel,
     setOpponentMove,
     getOpponentMove,
@@ -32,8 +34,9 @@ type GameMove = Int64
 -- 63    56 55    48 47    40 39    32 31    24 23    16 15     8 7      0
 -- =======================================================================|
 -- 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000|
---                    x                                                   | win      | 0: winning move; 1: otherwise
---                     *  maybe hard                                      | defence  | 0: disables all of the opponent's winning moves; 1: otherwise
+--                   x                                                    | win      | 0: winning move; 1: otherwise
+--                    x                                                   | lose     | 0: otherwise; 1: losing move
+--                     x                                                  | defence  | 0: disables at least one of the opponent's winning moves; 1: otherwise
 --                      x                                                 | step bld | 0: build that enables my worker to move up; 1: otherwise
 --                       x                                                | block bld| 0: build that disables one of the opponent's moving up; 1: otherwise
 --                        xxx                                             | mv to lv | 7 - (move to level)
@@ -50,7 +53,7 @@ type GameMove = Int64
 --                                                                       x| wid      | 0: worker 1; 1: worker 2
 
 createGameMove :: Int64
-createGameMove = (((1 :: Int64) `shift` 31) - 1) `shift` 32
+createGameMove = setValue 46 1 0 $ (((1 :: Int64) `shift` 31) - 1) `shift` 32
 
 getMask :: Int -> Int -> Int64
 getMask offset len = (((1 :: Int64) `shift` len) - 1) `shift` offset
@@ -93,10 +96,16 @@ getOpponentMove x =
     else (-1, 0)
 
 setWin :: Int64 -> Int64
-setWin = setValue 46 1 0
+setWin = setValue 47 1 0
 
 getWin :: Int64 -> Bool
-getWin x = getValue 46 1 x == 0
+getWin x = getValue 47 1 x == 0
+
+setLose :: Int64 -> Int64
+setLose = setValue 46 1 1
+
+getLose :: Int64 -> Bool
+getLose x = getValue 46 1 x == 1
 
 setDoubleMove :: Int64 -> Int64
 setDoubleMove = setValue 33 1 0

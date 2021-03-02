@@ -32,7 +32,7 @@ import Data.Board (Board (Board), Level, Player (Player))
 import qualified Data.Board
 import qualified Data.BoardWithoutCard
 import Data.Card (Card (Apollo, Artemis, Atlas, Demeter, Hephastus, Minotaur, Pan, Prometheus))
-import Data.List (sort, tails)
+import Data.List (find, sort, tails)
 import Data.Map (Map, (!))
 import qualified Data.Map
 import Data.Maybe (fromMaybe)
@@ -110,7 +110,7 @@ fromBoard' c1 c2 (w1, w2) (w3, w4) sp t =
       lm = createLevelMap lv
       adjM = createMoveAdjacencyList lv lm
       adjB = createBuildAdjacencyList lv lm
-      mv = getLegalMoves cs pl lv lm adjM adjB
+      mv = getLegalMoves True cs pl lv lm adjM adjB
    in GameState {cards = cs, players = pl, levels = lv, turn = t, levelMap = lm, moveAdjacency = adjM, buildAdjacency = adjB, legalMoves = mv}
 
 fromBoard :: Board -> GameState
@@ -280,47 +280,62 @@ getLegalBuildAt _ lv adjB emptySpace _ mt = [[(bl, (lv ! bl) + 1)] | bl <- toLis
 -- All legal moves
 --------------------------------------------------------------------------------
 
-getLegalMoves :: Cards -> Players -> Levels -> LevelMap -> AdjList -> AdjList -> [GameMove]
-getLegalMoves (c1 : _) pl lv lm adjM adjB = sort $ do
-  wk <- [0, 1]
-  let mf = pl !! 0 !! wk -- move from
-  let mfl = lv ! mf -- move from level
+getLegalMoves :: Bool -> Cards -> Players -> Levels -> LevelMap -> AdjList -> AdjList -> [GameMove]
+getLegalMoves effectiveOnly (c1 : _) pl lv lm adjM adjB =
+  let allMoves = do
+        wk <- [0, 1]
+        let mf = pl !! 0 !! wk -- move from
+        let mfl = lv ! mf -- move from level
 
-  -- bitmaps
-  let opponentWorkers = sum [1 `shift` x | x <- pl !! 1] :: Int
-  let friendWorker = 1 `shift` (pl !! 0 !! (1 - wk)) :: Int
-  let otherWorkers = opponentWorkers .|. friendWorker
-  let allWorkers = otherWorkers .|. (1 `shift` (pl !! 0 !! wk))
-  let emptySpace = ((1 `shift` 25) - 1) .&. complement ((lm ! 4) .|. otherWorkers) :: Bitmap
+        -- bitmaps
+        let opponentWorkers = sum [1 `shift` x | x <- pl !! 1] :: Int
+        let friendWorker = 1 `shift` (pl !! 0 !! (1 - wk)) :: Int
+        let otherWorkers = opponentWorkers .|. friendWorker
+        let allWorkers = otherWorkers .|. (1 `shift` (pl !! 0 !! wk))
+        let emptySpace = ((1 `shift` 25) - 1) .&. complement ((lm ! 4) .|. otherWorkers) :: Bitmap
 
-  -- move to
-  mt <- getLegalMoveTo c1 mf mfl lm friendWorker allWorkers emptySpace adjM
-  let mtl = lv ! mt -- move to level
-  let applyDoubleMove = if mt `bitElem` (adjM ! mf) then id else setDoubleMove
+        -- move to
+        mt <- getLegalMoveTo c1 mf mfl lm friendWorker allWorkers emptySpace adjM
+        let mtl = lv ! mt -- move to level
+        let applyDoubleMove = if mt `bitElem` (adjM ! mf) then id else setDoubleMove
 
-  -- push to
-  let pushInfo = getLegalPushTo c1 pl mf mt
-  let applyPushTo = maybe id (uncurry setOpponentMove) pushInfo
+        -- push to
+        let pushInfo = getLegalPushTo c1 pl mf mt
+        let applyPushTo = maybe id (uncurry setOpponentMove) pushInfo
 
-  -- check point 1
-  let moveSofar = (applyPushTo . applyDoubleMove . setMoveToLevel mtl . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
-  let emptySofar = emptySpace .&. complement (maybe 0 (\(_, pushTo) -> 1 `shift` pushTo) pushInfo)
+        -- check point 1
+        let moveSofar = (applyPushTo . applyDoubleMove . setMoveToLevel mtl . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
+        let emptySofar = emptySpace .&. complement (maybe 0 (\(_, pushTo) -> 1 `shift` pushTo) pushInfo)
 
-  -- check winning
-  -- Note: it's possible for Artemis to win by moving from level 1
-  if (mfl < 3 && mtl == 3) || (Pan `elem` c1 && mtl + 2 <= mfl)
-    then return $ setWin moveSofar
-    else do
-      -- move to (second)
-      bls <- getLegalBuildAt c1 lv adjB emptySofar mf mt
+        -- check winning
+        -- Note: it's possible for Artemis to win by moving like 1->2->3 or 3->2->3
+        if isWinningMove c1 mf mt lv lm
+          then -- TODO: implement early return (finding one move is enough)
+            return $ setWin moveSofar
+          else do
+            -- build at
+            bls <- getLegalBuildAt c1 lv adjB emptySofar mf mt
 
-      -- check point 2
-      let moveSofar' = setBuildAt bls moveSofar
+            -- check point 2
+            let moveSofar' = setBuildAt bls moveSofar
 
-      -- move evaluation
-      -- TODO: Implement
-      return moveSofar'
-getLegalMoves _ _ _ _ _ _ = undefined
+            -- move evaluation
+            -- TODO: Implement
+            return moveSofar'
+   in if effectiveOnly
+        then case find getWin allMoves of
+          Just m -> [m]  -- one winning move is enough
+          Nothing -> sort allMoves
+        else sort allMoves
+getLegalMoves _ _ _ _ _ _ _ = undefined
+
+isWinningMove :: Maybe Card -> Index -> Index -> Levels -> LevelMap -> Bool
+isWinningMove (Just Artemis) mf mt lv lm =
+  (lv ! mt) == 3 && (lv ! mf) == 3
+    && ((defaultNeighbors V.! mf) .&. (defaultNeighbors V.! mt) .&. (lm ! 2) /= 0)
+    || isWinningMove Nothing mf mt lv lm
+isWinningMove (Just Pan) mf mt lv lm = (lv ! mt) + 2 <= (lv ! mf) || isWinningMove Nothing mf mt lv lm
+isWinningMove _ mf mt lv _ = (lv ! mt) == 3 && (lv ! mf) < 3
 
 makeMove :: GameState -> GameMove -> GameState
 makeMove
@@ -388,6 +403,6 @@ makeMove
             (lv, lm, adjM, adjB)
             builds
 
-        mv' = getLegalMoves cs' pl' lv' lm' adjM' adjB'
+        mv' = getLegalMoves True cs' pl' lv' lm' adjM' adjB'
      in GameState {cards = cs', players = pl', levels = lv', turn = t', levelMap = lm', moveAdjacency = adjM', buildAdjacency = adjB', legalMoves = mv'}
 makeMove _ _ = undefined
