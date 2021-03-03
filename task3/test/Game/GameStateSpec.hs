@@ -40,14 +40,13 @@ getLegalBuildAt' b wk moveFrom =
         { cards = cs,
           players = pl,
           levels = lv,
-          levelMap = lm,
-          buildAdjacency = adjB
+          levelMap = lm
         } = fromBoard b
       opponentWorkers = sum [1 `shift` x | x <- pl !! 1] :: Int
       friendWorker = 1 `shift` (pl !! 0 !! (1 - wk)) :: Int
       otherWorkers = opponentWorkers .|. friendWorker
       emptySpace = ((1 `shift` 25) - 1) .&. complement ((lm ! 4) .|. otherWorkers) :: Bitmap
-   in getLegalBuildAt (cs !! 0) lv adjB emptySpace moveFrom (pl !! 0 !! wk)
+   in getLegalBuildAt (cs !! 0) lv emptySpace moveFrom (pl !! 0 !! wk)
 
 spec :: Spec
 spec = do
