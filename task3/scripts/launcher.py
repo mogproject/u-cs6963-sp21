@@ -4,7 +4,7 @@ Santorini benchmark launcher.
 """
 
 __author__ = 'Yosuke Mizutani'
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 __license__ = 'Apache License, Version 2.0'
 
 import sys
@@ -32,6 +32,7 @@ def get_parser():
     parser.add_argument('player2_exe', help='path to the second player program')
     parser.add_argument('-n', '--num-games', type=int, default=DEFAULT_NUM_GAMES, help=f'number of games (default:{DEFAULT_NUM_GAMES})')
     parser.add_argument('--timeout', type=int, help='move timeout in seconds (default:None)')
+    parser.add_argument('--cards', nargs=2, metavar='CARD', help='cards for players')
     return parser
 
 
@@ -51,9 +52,12 @@ def main(args):
     print(f'Player 1: {args.player1_exe}')
     print(f'Player 2: {args.player2_exe}')
 
-    cmd = [args.judge_exe, args.player1_exe, args.player2_exe]
+    cmd = [args.judge_exe]
     if args.timeout is not None:
         cmd += ['--timeout', args.timeout]
+    if args.cards is not None:
+        cmd += ['--cards'] + args.cards
+    cmd += [args.player1_exe, args.player2_exe]
 
     time_info = [[], []]
     winners = []
