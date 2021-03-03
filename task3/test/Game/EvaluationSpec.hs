@@ -25,9 +25,6 @@ import Game.GameState
     toBoard,
   )
 import Test.Hspec
-import Test.Hspec.QuickCheck (prop)
-
--- import Test.QuickCheck
 
 eval :: String -> Int
 eval s = evaluate $ fromBoard (fromMaybe undefined (readBoard s))
@@ -133,7 +130,7 @@ spec = do
       let b52 = fromBoard (fromMaybe undefined (readBoard s52))
 
       -- worker 2, (5,4) -> (4,5) build (5,5)
-      let b52' = makeMove b52 $ (setWorkerId 1 . setMoveFrom 23 . setMoveTo 19 . setBuildAt [(24, 2)]) createGameMove
+      let b52' = makeMove b52 $ (setWorkerId 1 . setMoveFrom 39 . setMoveTo 33 . setBuildAt [(40, 2)]) createGameMove
 
       let s53 = "{\"players\":[{\"card\":\"Prometheus\",\"tokens\":[[2,2],[4,2]]},{\"card\":\"Atlas\",\"tokens\":[[4,4],[4,5]]}],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,2]],\"turn\":3}"
       let b53 = fromBoard (fromMaybe undefined (readBoard s53))
@@ -141,17 +138,3 @@ spec = do
       toBoard b52' `shouldBe` toBoard b53
       b52' `shouldBe` b53
       eval s53 `shouldBe` evaluate b52'
-
-  describe "GameState#makeMove()" $ do
-    prop "does not have side effects" $ \b ->
-      let state = fromBoard b
-          moves = legalMoves state
-          nextStates = [makeMove state m | m <- moves]
-       in do
-            -- print state
-            -- print $ head moves
-            --  (fromBoard . toBoard) (head nextStates) `shouldBe` (head nextStates)
-            foldl
-              (\_ x -> (fromBoard . toBoard) x `shouldBe` x)
-              (True `shouldBe` True)
-              nextStates

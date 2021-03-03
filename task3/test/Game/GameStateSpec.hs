@@ -1,18 +1,19 @@
 module Game.GameStateSpec (spec) where
 
-import Data.Bits (Bits (complement, shift, (.&.), (.|.)))
+import Data.Bits (Bits ((.|.)))
 import Data.Board (readBoard)
 import qualified Data.Board as B
 import Data.Card
 import Data.Map ((!))
 import Data.Maybe (fromMaybe)
-import Game.GameMove
+import Game.BitBoard
 import Game.GameState
 import Test.Hspec
+import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 
 -- rc to index
 ri :: Int -> Int -> Int
-ri r c = (r - 1) * 5 + (c - 1)
+ri r c = posToIndex (r, c)
 
 getLegalMoveTo' :: B.Board -> [[Int]]
 getLegalMoveTo' b =
@@ -20,17 +21,17 @@ getLegalMoveTo' b =
         { cards = cs,
           players = pl,
           levelMap = lm,
-          moveAdjacency = adjM
+          moveAdjacency = adj
         } = fromBoard b
 
       f wk =
         let mf = pl !! 0 !! wk
-            opponentWorkers = sum [1 `shift` x | x <- pl !! 1] :: Int
-            friendWorker = 1 `shift` (pl !! 0 !! (1 - wk)) :: Int
-            otherWorkers = opponentWorkers .|. friendWorker
-            allWorkers = otherWorkers .|. (1 `shift` (pl !! 0 !! wk))
-            emptySpace = ((1 `shift` 25) - 1) .&. complement ((lm ! 4) .|. otherWorkers) :: Bitmap
-         in getLegalMoveTo (cs !! 0) mf lm friendWorker allWorkers emptySpace adjM
+            opponentWorkers = sum . map singletonBB $ pl !! 1
+            friend = singletonBB $ pl !! 0 !! (1 - wk)
+            otherWorkers = opponentWorkers .|. friend
+            allWorkers = otherWorkers .|. singletonBB (pl !! 0 !! wk)
+            emptySpace = globalMask `andNotBB` ((lm ! 4) .|. otherWorkers)
+         in getLegalMoveTo (cs !! 0) mf lm friend allWorkers emptySpace adj
    in [f wk | wk <- [0, 1]]
 
 -- b: board after a move
@@ -42,10 +43,11 @@ getLegalBuildAt' b wk moveFrom =
           levels = lv,
           levelMap = lm
         } = fromBoard b
-      opponentWorkers = sum [1 `shift` x | x <- pl !! 1] :: Int
-      friendWorker = 1 `shift` (pl !! 0 !! (1 - wk)) :: Int
+
+      opponentWorkers = sum . map singletonBB $ pl !! 1
+      friendWorker = singletonBB $ pl !! 0 !! (1 - wk)
       otherWorkers = opponentWorkers .|. friendWorker
-      emptySpace = ((1 `shift` 25) - 1) .&. complement ((lm ! 4) .|. otherWorkers) :: Bitmap
+      emptySpace = globalMask `andNotBB` ((lm ! 4) .|. otherWorkers)
    in getLegalBuildAt (cs !! 0) lv emptySpace moveFrom (pl !! 0 !! wk)
 
 spec :: Spec
@@ -460,3 +462,45 @@ spec = do
                      [(ri 3 3, 3)],
                      [(ri 3 5, 4)]
                    ]
+
+  describe "GameState#makeMove()" $ do
+    it "has no side effects" $ do
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Minotaur, B.tokens = Just ((3, 1), (5, 5))},
+                    B.Player {B.card = Demeter, B.tokens = Just ((3, 5), (3, 2))}
+                  ),
+                B.spaces =
+                  [ [3, 0, 2, 1, 2],
+                    [2, 4, 0, 0, 1],
+                    [1, 0, 1, 2, 0],
+                    [4, 2, 4, 3, 1],
+                    [4, 0, 0, 4, 0]
+                  ],
+                B.turn = 41
+              }
+      let s1 = fromBoard b1
+      let moves = legalMoves s1
+      let nextStates = [makeMove s1 m | m <- moves]
+
+      (fromBoard . toBoard) (nextStates !! 10) `shouldBe` (nextStates !! 10)
+
+      foldl
+        (\_ x -> (fromBoard . toBoard) x `shouldBe` x)
+        (True `shouldBe` True)
+        nextStates
+
+    modifyMaxSuccess (const 10000) $
+      prop "has no side effects" $ \b ->
+        let state = fromBoard b
+            moves = legalMoves state
+            nextStates = [makeMove state m | m <- moves]
+         in do
+              -- print state
+              -- print $ head moves
+              --  (fromBoard . toBoard) (head nextStates) `shouldBe` (head nextStates)
+              foldl
+                (\_ x -> (fromBoard . toBoard) x `shouldBe` x)
+                (True `shouldBe` True)
+                nextStates

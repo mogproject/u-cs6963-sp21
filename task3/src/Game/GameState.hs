@@ -17,17 +17,14 @@ module Game.GameState
     Cards,
     Players,
     Levels,
-    Bitmap,
+    LevelMap,
     AdjList,
-    toList,
-    fromList,
     getLegalMoveTo,
     getLegalBuildAt,
-    defaultNeighbors,
   )
 where
 
-import Data.Bits (complement, countTrailingZeros, shift, xor, (.&.), (.|.))
+import Data.Bits (complement, shift, xor, (.&.), (.|.))
 import Data.Board (Board (Board), Level, Player (Player))
 import qualified Data.Board
 import qualified Data.BoardWithoutCard
@@ -35,11 +32,8 @@ import Data.Card (Card (Apollo, Artemis, Atlas, Demeter, Hephastus, Minotaur, Pa
 import Data.List (find, sort, tails)
 import Data.Map (Map, (!))
 import qualified Data.Map
-import qualified Data.Vector.Unboxed as V
+import Game.BitBoard
 import Game.GameMove
-
--- "vectorize" positions
-type Index = Int -- 0 (row=1, col=1), 1 (row=1, col=2), ..., 24 (row=5, col=5)
 
 type WorkerId = Int -- 0 or 1
 
@@ -47,15 +41,13 @@ type Cards = [Maybe Card]
 
 type Players = [[Index]]
 
-type Levels = Map Index Level
-
-type LevelMap = Map Level Bitmap
-
 type Turn = Int
 
-type Bitmap = Int -- 25 bits
+type Levels = Map Index Level
 
-type AdjList = Map Index Bitmap -- adjacency list from each index
+type LevelMap = Map Level BitBoard
+
+type AdjList = Map Index BitBoard -- adjacency list from each index
 
 -- Internal representation of game states.
 data GameState = GameState
@@ -64,47 +56,20 @@ data GameState = GameState
     levels :: Levels, -- Levels
     turn :: Turn,
     levelMap :: LevelMap, -- level [0..4] -> bitmap
-    moveAdjacency :: AdjList, -- move adjacency list: index [0..24] -> bitmap
+    moveAdjacency :: AdjList, -- move adjacency list: index -> bitboard
     legalMoves :: [GameMove] -- Legal moves
   }
   deriving (Ord, Eq, Show)
 
 --------------------------------------------------------------------------------
--- Bit Operations
---------------------------------------------------------------------------------
-
-fromList :: [Int] -> Bitmap
--- xs must be distinct and between 0 and 63.
-fromList xs = sum [1 `shift` x | x <- xs]
-
-toList :: Bitmap -> [Int]
-toList x = tail . map fst $ takeWhile ((/= -1) . fst) $ iterate f (0, x)
-  where
-    f (_, y) =
-      if y == 0
-        then (-1, 0)
-        else
-          let p = countTrailingZeros y
-           in (p, y `xor` (1 `shift` p))
-
-bitElem :: Int -> Bitmap -> Bool
-bitElem i x = (x `shift` (- i)) .&. 1 == 1
-
---------------------------------------------------------------------------------
 -- I/O
 --------------------------------------------------------------------------------
-
-toIndex :: Data.Board.Pos -> Index
-toIndex (r, c) = (r - 1) * 5 + (c - 1)
-
-fromIndex :: Index -> Data.Board.Pos
-fromIndex i = (i `div` 5 + 1, i `mod` 5 + 1)
 
 fromBoard' :: Maybe Card -> Maybe Card -> Data.Board.Workers -> Data.Board.Workers -> [[Data.Board.Level]] -> Int -> GameState
 fromBoard' c1 c2 (w1, w2) (w3, w4) sp t =
   let cs = [c1, c2]
-      pl = [[toIndex w1, toIndex w2], [toIndex w3, toIndex w4]]
-      lv = Data.Map.fromList . zip [0 .. 24] $ concat sp
+      pl = [[posToIndex w1, posToIndex w2], [posToIndex w3, posToIndex w4]]
+      lv = Data.Map.fromList [(posToIndex (r, c), sp !! (r -1) !! (c -1)) | r <- [1 .. 5], c <- [1 .. 5]]
       lm = createLevelMap lv
       adj = createMoveAdjacencyList lv lm
       mv = getLegalMoves True cs pl lv lm adj
@@ -130,17 +95,17 @@ fromBoardWithoutCard _ = undefined
 toBoard :: GameState -> Board
 toBoard GameState {cards = [Just c1, Just c2], players = [[w1, w2], [w3, w4]], levels = lv, turn = t} =
   let pl =
-        ( Player {Data.Board.card = c1, Data.Board.tokens = Just (fromIndex w1, fromIndex w2)},
-          Player {Data.Board.card = c2, Data.Board.tokens = Just (fromIndex w3, fromIndex w4)}
+        ( Player {Data.Board.card = c1, Data.Board.tokens = Just (indexToPos w1, indexToPos w2)},
+          Player {Data.Board.card = c2, Data.Board.tokens = Just (indexToPos w3, indexToPos w4)}
         )
-      sp = [[lv ! (r * 5 + c) | c <- [0 .. 4]] | r <- [0 .. 4]]
+      sp = [[lv ! posToIndex (r, c) | c <- [1 .. 5]] | r <- [1 .. 5]]
    in Board {Data.Board.players = pl, Data.Board.spaces = sp, Data.Board.turn = t}
 toBoard _ = undefined
 
 toBoardWithoutCard :: GameState -> Data.BoardWithoutCard.Board
 toBoardWithoutCard GameState {players = [[w1, w2], [w3, w4]], levels = lv, turn = t} =
-  let pl = [(fromIndex w1, fromIndex w2), (fromIndex w3, fromIndex w4)]
-      sp = [[lv ! (r * 5 + c) | c <- [0 .. 4]] | r <- [0 .. 4]]
+  let pl = [(indexToPos w1, indexToPos w2), (indexToPos w3, indexToPos w4)]
+      sp = [[lv ! posToIndex (r, c) | c <- [1 .. 5]] | r <- [1 .. 5]]
    in Data.BoardWithoutCard.Board {Data.BoardWithoutCard.players = pl, Data.BoardWithoutCard.spaces = sp, Data.BoardWithoutCard.turn = t}
 toBoardWithoutCard _ = undefined
 
@@ -148,48 +113,29 @@ toBoardWithoutCard _ = undefined
 -- Moves
 --------------------------------------------------------------------------------
 
-defaultNeighbors :: V.Vector Bitmap
-defaultNeighbors = V.fromList [(fromList . filter (>= 0)) [f r c d | d <- [0 .. 7]] | r <- [0 .. 4], c <- [0 .. 4]]
-  where
-    rowOffset = V.fromList [-1, -1, 0, 1, 1, 1, 0, -1] :: V.Vector Int
-    colOffset = V.fromList [0, 1, 1, 1, 0, -1, -1, -1] :: V.Vector Int
-    f r c d =
-      let rr = r + (rowOffset V.! d)
-          cc = c + (colOffset V.! d)
-       in if 0 <= rr && rr <= 4 && 0 <= cc && cc <= 4 then rr * 5 + cc else -1
-
--- used for Minotaur's move
-pushToTable :: V.Vector Index
-pushToTable = V.fromList [f mf mt | mf <- [0 .. 24], mt <- [0 .. 24]]
-  where
-    f moveFrom moveTo =
-      let pushTo = moveTo * 2 - moveFrom
-          nbrs = defaultNeighbors V.! moveTo
-          isValid = 0 <= pushTo && pushTo <= 24 && moveFrom `bitElem` nbrs && pushTo `bitElem` nbrs
-       in if isValid then pushTo else -1
-
-lookupPushTo :: Index -> Index -> Index
-lookupPushTo moveFrom moveTo = pushToTable V.! (moveFrom * 25 + moveTo)
-
 createLevelMap :: Levels -> LevelMap
-createLevelMap lv = Data.Map.fromList [(l, fromList [fst x | x <- Data.Map.toList lv, snd x == l]) | l <- [0 .. 4]]
+createLevelMap lv =
+  let m = Data.Map.fromListWith (.|.) [(v, singletonBB k) | (k, v) <- Data.Map.toList lv]
+   in Data.Map.union m (Data.Map.fromList [(l, 0) | l <- [0 .. 4]])
 
 createMoveAdjacencyList :: Levels -> LevelMap -> AdjList
-createMoveAdjacencyList lv lm = Data.Map.fromList [(i, if lv ! i == 4 then 0 else (defaultNeighbors V.! i) .&. sum [lm ! h | h <- [0 .. (min 3 ((lv ! i) + 1))]]) | i <- [0 .. 24]]
+createMoveAdjacencyList lv lm =
+  let f i = getNeighborhood i .&. sum [lm ! h | h <- [0 .. (min 3 ((lv ! i) + 1))]]
+   in Data.Map.fromList [(i, if lv ! i == 4 then 0 else f i) | i <- validIndices]
 
 --------------------------------------------------------------------------------
 -- Move to
 --------------------------------------------------------------------------------
-getLegalMoveTo :: Maybe Card -> Index -> LevelMap -> Bitmap -> Bitmap -> Bitmap -> AdjList -> [Index]
+getLegalMoveTo :: Maybe Card -> Index -> LevelMap -> BitBoard -> BitBoard -> BitBoard -> AdjList -> [Index]
 --
 -- [Artemis]
 -- The moved token can optionally move a second time (i.e., the same token),
 -- as long as the first move doesn’t win, and as long as the second move doesn’t return
 -- to the original space.
 getLegalMoveTo (Just Artemis) mf lm _ allWorkers _ adj =
-  let firstMove = (adj ! mf) .&. complement allWorkers
-      secondMoveFrom = (if mf `bitElem` (lm ! 2) then (complement (lm ! 3) .&.) else id) firstMove
-   in toList $ foldl (\z x -> z .|. adj ! x) firstMove (toList secondMoveFrom) .&. complement allWorkers
+  let firstMove = (adj ! mf) `andNotBB` allWorkers
+      secondMoveFrom = (if mf `elemBB` (lm ! 2) then (\x -> x `andNotBB` (lm ! 3)) else id) firstMove
+   in bbToList $ foldl (\z x -> z .|. adj ! x) firstMove (bbToList secondMoveFrom) `andNotBB` allWorkers
 --
 -- [Minotaur]
 -- A token’s move can optionally enter the space of an opponent’s token,
@@ -197,27 +143,25 @@ getLegalMoveTo (Just Artemis) mf lm _ allWorkers _ adj =
 -- the token would be able to move to the opponent’s space if the opponent token were not there.
 -- The unoccupied space where the opponent’s token is pushed can be at any level less than 4.
 getLegalMoveTo (Just Minotaur) mf _ friend _ emptySpace adj =
-  let candidates = (adj ! mf) .&. complement friend
-      isValidPushTo pt = pt /= -1 && pt `bitElem` emptySpace
-   in filter (\x -> x `bitElem` emptySpace || (isValidPushTo . lookupPushTo mf) x) (toList candidates)
+  let candidates = (adj ! mf) `andNotBB` friend
+      isValidMoveTo mt = getPointSymmetricIndex mt mf `elemBB` emptySpace -- works only if mf and mt are adjacent
+   in filter (\x -> x `elemBB` emptySpace || isValidMoveTo x) (bbToList candidates)
 --
 -- [Apollo]
 -- A token’s move can optionally swap places with an adjacent opponent token,
 -- as long as the token would be able to move to the opponent’s space if the
 -- opponent token were not there; otherwise, the move must be to an unoccupied space as usual.
-getLegalMoveTo (Just Apollo) mf _ friend _ _ adj = toList $ (adj ! mf) .&. complement friend
+getLegalMoveTo (Just Apollo) mf _ friend _ _ adj = bbToList $ (adj ! mf) `andNotBB` friend
 --
 -- Others.
-getLegalMoveTo _ mf _ _ allWorkers _ adj = toList $ (adj ! mf) .&. complement allWorkers
+getLegalMoveTo _ mf _ _ allWorkers _ adj = bbToList $ (adj ! mf) `andNotBB` allWorkers
 
 --------------------------------------------------------------------------------
 -- Push to
 --------------------------------------------------------------------------------
 getLegalPushTo :: Maybe Card -> Players -> Index -> Index -> Maybe (WorkerId, Index)
-getLegalPushTo (Just Apollo) pl mf mt | pl !! 1 !! 0 == mt = Just (0, mf)
-getLegalPushTo (Just Apollo) pl mf mt | pl !! 1 !! 1 == mt = Just (1, mf)
-getLegalPushTo (Just Minotaur) pl mf mt | pl !! 1 !! 0 == mt = Just (0, lookupPushTo mf mt)
-getLegalPushTo (Just Minotaur) pl mf mt | pl !! 1 !! 1 == mt = Just (1, lookupPushTo mf mt)
+getLegalPushTo (Just Apollo) [_, p] mf mt | mt `elem` p = Just (if p !! 0 == mt then 0 else 1, mf)
+getLegalPushTo (Just Minotaur) [_, p] mf mt | mt `elem` p = Just (if p !! 0 == mt then 0 else 1, getPointSymmetricIndex mt mf)
 getLegalPushTo _ _ _ _ = Nothing
 
 --------------------------------------------------------------------------------
@@ -229,20 +173,20 @@ combinations :: Int -> [a] -> [[a]]
 combinations 0 _ = [[]]
 combinations n xs = [y : ys | y : xs' <- tails xs, ys <- combinations (n -1) xs']
 
-getLegalBuildAt :: Maybe Card -> Levels -> Bitmap -> Index -> Index -> [[(Index, Level)]]
+getLegalBuildAt :: Maybe Card -> Levels -> BitBoard -> Index -> Index -> [[(Index, Level)]]
 --
 -- [Atlas]
 -- The build phase can build a space currently at level 0, 1, 2 to make it level 4,
 -- instead of building to exactly one more than the space’s current level.
 getLegalBuildAt (Just Atlas) lv emptySpace _ mt =
   let hs l = if l == 3 then [4] else [l + 1, 4]
-   in [[(bl, h)] | bl <- toList $ (defaultNeighbors V.! mt) .&. emptySpace, h <- hs (lv ! bl)]
+   in [[(bl, h)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace, h <- hs (lv ! bl)]
 --
 -- [Demeter]
 -- The moved token can optionally build a second time, but not on the same space
 -- as the first build within a turn.
 getLegalBuildAt (Just Demeter) lv emptySpace _ mt =
-  let cand = toList $ (defaultNeighbors V.! mt) .&. emptySpace
+  let cand = bbToList $ getNeighborhood mt .&. emptySpace
       comb = [[x] | x <- cand] ++ combinations 2 cand
    in [[(x, (lv ! x) + 1) | x <- xs] | xs <- comb]
 --
@@ -251,7 +195,7 @@ getLegalBuildAt (Just Demeter) lv emptySpace _ mt =
 -- as the first build within a turn, and only if the second build does not reach level 4.
 getLegalBuildAt (Just Hephastus) lv emptySpace _ mt =
   let hs l = if l <= 1 then [l + 1, l + 2] else [l + 1]
-   in [[(bl, h)] | bl <- toList $ (defaultNeighbors V.! mt) .&. emptySpace, h <- hs (lv ! bl)]
+   in [[(bl, h)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace, h <- hs (lv ! bl)]
 --
 -- [Prometheus]
 -- A token can optionally build before moving, but then the move is constrained to
@@ -259,9 +203,9 @@ getLegalBuildAt (Just Hephastus) lv emptySpace _ mt =
 -- than the level of the token’s old space).
 getLegalBuildAt (Just Prometheus) lv emptySpace mf mt
   | (lv ! mf) >= (lv ! mt) =
-    let secondBuild = toList $ (defaultNeighbors V.! mt) .&. emptySpace
+    let secondBuild = bbToList $ getNeighborhood mt .&. emptySpace
         forbidden = if (lv ! mf) == (lv ! mt) then complement (1 `shift` mt) else -1
-        firstBuild = toList $ (defaultNeighbors V.! mf) .&. emptySpace .&. forbidden
+        firstBuild = bbToList $ getNeighborhood mf .&. emptySpace .&. forbidden
      in getLegalBuildAt Nothing lv emptySpace mf mt
           ++ [ if x == y then [(x, (lv ! x) + 2)] else [(x, (lv ! x) + 1), (y, (lv ! y) + 1)]
                | x <- secondBuild,
@@ -270,7 +214,7 @@ getLegalBuildAt (Just Prometheus) lv emptySpace mf mt
              ]
 --
 -- Others.
-getLegalBuildAt _ lv emptySpace _ mt = [[(bl, (lv ! bl) + 1)] | bl <- toList $ (defaultNeighbors V.! mt) .&. emptySpace]
+getLegalBuildAt _ lv emptySpace _ mt = [[(bl, (lv ! bl) + 1)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace]
 
 --------------------------------------------------------------------------------
 -- All legal moves
@@ -282,16 +226,16 @@ getLegalMoves effectiveOnly (c1 : _) pl lv lm adj =
         wk <- [0, 1]
         let mf = pl !! 0 !! wk -- move from
 
-        -- bitmaps
-        let opponentWorkers = sum [1 `shift` x | x <- pl !! 1] :: Int
-        let friendWorker = 1 `shift` (pl !! 0 !! (1 - wk)) :: Int
+        -- bitboards
+        let opponentWorkers = (sum . map singletonBB) (pl !! 1)
+        let friendWorker = singletonBB (pl !! 0 !! (1 - wk))
         let otherWorkers = opponentWorkers .|. friendWorker
-        let allWorkers = otherWorkers .|. (1 `shift` (pl !! 0 !! wk))
-        let emptySpace = ((1 `shift` 25) - 1) .&. complement ((lm ! 4) .|. otherWorkers) :: Bitmap
+        let allWorkers = otherWorkers .|. singletonBB (pl !! 0 !! wk)
+        let emptySpace = globalMask `andNotBB` ((lm ! 4) .|. otherWorkers)
 
         -- move to
         mt <- getLegalMoveTo c1 mf lm friendWorker allWorkers emptySpace adj
-        let applyDoubleMove = if mt `bitElem` (adj ! mf) then id else setDoubleMove
+        let applyDoubleMove = if mt `elemBB` (adj ! mf) then id else setDoubleMove
 
         -- push to
         let pushInfo = getLegalPushTo c1 pl mf mt
@@ -326,7 +270,7 @@ getLegalMoves _ _ _ _ _ _ = undefined
 isWinningMove :: Maybe Card -> Index -> Index -> Levels -> LevelMap -> Bool
 isWinningMove (Just Artemis) mf mt lv lm =
   (lv ! mt) == 3 && (lv ! mf) == 3
-    && ((defaultNeighbors V.! mf) .&. (defaultNeighbors V.! mt) .&. (lm ! 2) /= 0)
+    && (getNeighborhood mf .&. getNeighborhood mt .&. (lm ! 2) /= 0)
     || isWinningMove Nothing mf mt lv lm
 isWinningMove (Just Pan) mf mt lv lm = (lv ! mt) + 2 <= (lv ! mf) || isWinningMove Nothing mf mt lv lm
 isWinningMove _ mf mt lv _ = (lv ! mt) == 3 && (lv ! mf) < 3
@@ -339,8 +283,7 @@ makeMove
       levels = lv,
       turn = t,
       levelMap = lm,
-      moveAdjacency = adj,
-      legalMoves = _
+      moveAdjacency = adj
     }
   mv =
     -- assume: m `elem` mv
@@ -364,9 +307,9 @@ makeMove
           foldl
             ( \(xlv, xlm, xadj) (bl, nextLevel) ->
                 let prevLevel = xlv ! bl
-                    f = Data.Map.adjust (xor (1 `shift` bl)) -- toggle bl bit
-                    f' = Data.Map.adjust (.&. complement (1 `shift` bl)) -- remove bl bit
-                    g lo hi = foldl (.|.) 0 [xlm ! h | h <- [lo .. hi]] -- merge level range
+                    f = Data.Map.adjust (xor (singletonBB bl)) -- toggle bl bit
+                    f' = Data.Map.adjust (\x -> x `andNotBB` singletonBB bl) -- remove bl bit
+                    g lo hi = sum [xlm ! h | h <- [lo .. hi]] -- merge level range
 
                     -- levels
                     xlv' = Data.Map.insert bl nextLevel xlv
@@ -376,16 +319,16 @@ makeMove
                     -- update adjacency lists
                     addArc m =
                       if prevLevel <= 1 -- add arc: bl -> high N(bl)
-                        then Data.Map.adjust (.|. ((defaultNeighbors V.! bl) .&. g (prevLevel + 2) (min 3 (nextLevel + 1)))) bl m
+                        then Data.Map.adjust (.|. (getNeighborhood bl .&. g (prevLevel + 2) (min 3 (nextLevel + 1)))) bl m
                         else m
                     removeArc m =
                       if nextLevel >= 2 -- remove arc: low N(bl) -> bl
-                        then foldl (flip f) m (toList ((defaultNeighbors V.! bl) .&. g (max 0 (prevLevel - 1)) (nextLevel - 2)))
+                        then foldl (flip f) m (bbToList (getNeighborhood bl .&. g (max 0 (prevLevel - 1)) (nextLevel - 2)))
                         else m
 
                     xadj'
                       | prevLevel == nextLevel = xadj
-                      | nextLevel == 4 = foldl (flip f') (Data.Map.insert bl 0 xadj) (toList ((defaultNeighbors V.! bl) .&. complement (lv ! 4))) -- capped
+                      | nextLevel == 4 = foldl (flip f') (Data.Map.insert bl 0 xadj) (bbToList (getNeighborhood bl `andNotBB` (xlm ! 4))) -- capped
                       | otherwise = (removeArc . addArc) xadj
                  in (xlv', xlm', xadj')
             )

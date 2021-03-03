@@ -11,7 +11,7 @@ module Game.Evaluation
   )
 where
 
-import Data.Bits (complement, popCount, shift, (.&.), (.|.))
+import Data.Bits (complement, (.&.), (.|.))
 import Data.Card (Card (Apollo, Artemis, Atlas, Demeter, Hephastus, Minotaur, Pan, Prometheus))
 import Data.Map (Map, (!))
 import qualified Data.Map
@@ -21,23 +21,21 @@ import qualified Data.Vector.Unboxed as V
 import Game.GameMove
 import Game.GameState
   ( AdjList,
-    Bitmap,
     Cards,
     GameState (GameState),
     Index,
     Levels,
+    LevelMap,
     Players,
     cards,
-    fromList,
     legalMoves,
     levelMap,
     levels,
     moveAdjacency,
-    defaultNeighbors,
     players,
-    toList,
     turn,
   )
+import Game.BitBoard
 
 --------------------------------------------------------------------------------
 -- Types
@@ -129,30 +127,30 @@ distInf :: Int
 distInf = 100 -- infinity distance
 
 -- breadth-first search
-bfs :: AdjList -> Bitmap -> Index -> Map Index Int
+bfs :: AdjList -> BitBoard -> Index -> Map Index Int
 bfs adj avail start =
-  let initMap = Data.Map.fromList [(i, if i == start then 0 else distInf) | i <- [0 .. 24]]
+  let initMap = Data.Map.fromList [(i, if i == start then 0 else distInf) | i <- validIndices]
    in bfs' adj avail (Seq.singleton start) initMap
 
-bfs' :: AdjList -> Bitmap -> Seq Index -> Map Index Int -> Map Index Int
+bfs' :: AdjList -> BitBoard -> Seq Index -> Map Index Int -> Map Index Int
 bfs' _ _ q sofar | Seq.null q = sofar
 bfs' adj avail q sofar =
   let x = q `Seq.index` 0
-      nbrs = toList $ (adj ! x) .&. avail
+      nbrs = bbToList $ (adj ! x) .&. avail
       unseen = Seq.fromList [nbr | nbr <- nbrs, (sofar ! nbr) == distInf]
       d = (sofar ! x) + 1
       q' = Seq.drop 1 q Seq.>< unseen
       sofar' = foldl (\m u -> Data.Map.insert u d m) sofar unseen
    in bfs' adj avail q' sofar'
 
-getDistances :: Cards -> Players -> AdjList -> ([[Map Index Int]], [V.Vector Int])
+getDistances :: Cards -> Players -> AdjList -> ([[Map Index Int]], [Map Index Int])
 getDistances cs pl adj =
-  let ps = [fromList ws | ws <- pl] -- player bitmaps
+  let ps = [listToBB ws | ws <- pl] -- player bitboards
       f p = any (\x -> x `elem` (cs !! p)) [Apollo, Minotaur] -- those gods ignore opponent's positions
       obstacles = [if f p then 0 else ps !! (1 - p) | p <- [0, 1]]
       dist' = [[bfs adj (complement (obstacles !! p)) (pl !! p !! w) | w <- [0, 1]] | p <- [0, 1]]
       dist = [if Artemis `elem` (cs !! p) then [Data.Map.map (\x -> (x + 1) `div` 2) (dist' !! p !! w) | w <- [0, 1]] else dist' !! p | p <- [0, 1]]
-      bestDist = [V.fromList [minimum [dist !! p !! w ! i | w <- [0, 1]] | i <- [0 .. 24]] | p <- [0, 1]]
+      bestDist = [Data.Map.fromList [(i, minimum [dist !! p !! w ! i | w <- [0, 1]]) | i <- validIndices] | p <- [0, 1]]
    in (dist, bestDist)
 
 --------------------------------------------------------------------------------
@@ -165,7 +163,7 @@ evaluate
       players = pl,
       levels = lv,
       turn = _,
-      levelMap = _,
+      levelMap = lm,
       moveAdjacency = adj,
       legalMoves = _
     } = case evaluate' g of
@@ -175,9 +173,9 @@ evaluate
           funcs =
             [ evaluateWorkerProximity pl dist,
               evaluateReachability lv bestDist,
-              evaluateAsymmetry pl lv bestDist,
+              evaluateAsymmetry pl lv lm bestDist,
               evaluateStuckBonus pl adj,
-              evaluatePrevention pl lv bestDist,
+              evaluatePrevention pl lv lm bestDist,
               evaluatePanBonus cs pl lv
             ]
        in sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
@@ -197,17 +195,17 @@ evaluateWorkerProximity :: Players -> [[Map Index Int]] -> Int -> Score
 evaluateWorkerProximity pl dist p = sum [getProxTableValue (dist !! p !! w ! (pl !! p !! (1 - w))) | w <- [0, 1]]
 
 -- (2) Reachability
-evaluateReachability :: Levels -> [V.Vector Int] -> Int -> Score
-evaluateReachability lv dist p = sum [getReachTableValue p (lv ! i) (dist !! p V.! i) | i <- [0 .. 24]]
+evaluateReachability :: Levels -> [Map Index Int] -> Int -> Score
+evaluateReachability lv dist p = sum [getReachTableValue p (lv ! i) (dist !! p ! i) | i <- validIndices]
 
 -- (3) Asymmetry
-evaluateAsymmetry :: Players -> Levels -> [V.Vector Int] -> Int -> Score
-evaluateAsymmetry pl lv dist p = sum [g i | i <- [0 .. 24]]
+evaluateAsymmetry :: Players -> Levels -> LevelMap -> [Map Index Int] -> Int -> Score
+evaluateAsymmetry pl lv lm dist p = sum . map g $ validIndices
   where
-    ws = sum [(1 :: Int) `shift` x | x <- concat pl] -- all workers
-    cornerBonus i = (8 - popCount ((defaultNeighbors V.! i) .&. complement (ws .|. (lv ! 4)))) * (lv ! i) * evalCornerBonus
+    ws = sum . map singletonBB . concat $ pl -- all workers
+    cornerBonus i = (8 - countBB (getNeighborhood i `andNotBB` (ws .|. (lm ! 4)))) * (lv ! i) * evalCornerBonus
     g i =
-      let diff = (dist !! (1 - p) V.! i) - (dist !! p V.! i)
+      let diff = (dist !! (1 - p) ! i) - (dist !! p ! i)
        in if diff > 0 then cornerBonus i + getAsymTableValue (lv ! i) diff else 0
 
 -- (4) Stuck Bonus
@@ -215,12 +213,12 @@ evaluateStuckBonus :: Players -> AdjList -> Int -> Score
 evaluateStuckBonus pl adj p = sum [if adj ! (pl !! (1 - p) !! w) == 0 then evalStuckBonus else 0 | w <- [0, 1]]
 
 -- (5) Prevension: worker at height 2, opponent cannot approach
-evaluatePrevention :: Players -> Levels -> [V.Vector Int] -> Int -> Score
-evaluatePrevention pl lv dist p = sum [f index | w <- [0, 1], let index = pl !! p !! w, lv ! index == 2]
+evaluatePrevention :: Players -> Levels -> LevelMap -> [Map Index Int] -> Int -> Score
+evaluatePrevention pl lv lm dist p = sum [f index | w <- [0, 1], let index = pl !! p !! w, lv ! index == 2]
   where
     f index =
-      let nbrs = defaultNeighbors V.! index .&. (complement (lv ! 4))
-       in if nbrs > 0 && minimum [dist !! (1 - p) V.! u | u <- toList nbrs] >= 2
+      let nbrs = getNeighborhood index `andNotBB` (lm ! 4)
+       in if nbrs > 0 && minimum [dist !! (1 - p) ! u | u <- bbToList nbrs] >= 2
             then evalPreventionAdvantage
             else 0
 
@@ -242,10 +240,10 @@ evaluateReachability' :: GameState -> Int -> Score
 evaluateReachability' GameState {cards = cs, players = pl, levels = lv, moveAdjacency = adj} = evaluateReachability lv (snd $ getDistances cs pl adj)
 
 evaluateAsymmetry' :: GameState -> Int -> Score
-evaluateAsymmetry' GameState {cards = cs, players = pl, levels = lv, moveAdjacency = adj} = evaluateAsymmetry pl lv (snd $ getDistances cs pl adj)
+evaluateAsymmetry' GameState {cards = cs, players = pl, levels = lv, levelMap = lm, moveAdjacency = adj} = evaluateAsymmetry pl lv lm (snd $ getDistances cs pl adj)
 
 evaluateStuckBonus' :: GameState -> Int -> Score
 evaluateStuckBonus' GameState {players = pl, moveAdjacency = adj} = evaluateStuckBonus pl adj
 
 evaluatePrevention' :: GameState -> Int -> Score
-evaluatePrevention' GameState {cards = cs, players = pl, levels = lv, moveAdjacency = adj} = evaluatePrevention pl lv (snd $ getDistances cs pl adj)
+evaluatePrevention' GameState {cards = cs, players = pl, levels = lv, levelMap = lm, moveAdjacency = adj} = evaluatePrevention pl lv lm (snd $ getDistances cs pl adj)

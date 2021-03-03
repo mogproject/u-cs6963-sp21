@@ -1,6 +1,10 @@
 module Game.BitBoard
   ( BitBoard,
-    rcToIndex,
+    Index,
+    posToIndex,
+    indexToPos,
+    elemBB,
+    andNotBB,
     globalMask,
     showBB,
     singletonBB,
@@ -9,13 +13,14 @@ module Game.BitBoard
     countBB,
     getNeighborhood,
     getClosedNeighborhood,
+    validIndices,
     isValidIndex,
     getPointSymmetricIndex,
-  ) 
+  )
 where
 
+import Data.Bits (Bits (complement), countTrailingZeros, popCount, shift, xor, (.&.), (.|.))
 import Data.Int (Int64)
-import Data.Bits (shift, (.&.), (.|.), popCount, xor, countTrailingZeros)
 
 -- Bitwise representation of the board
 --
@@ -32,19 +37,35 @@ import Data.Bits (shift, (.&.), (.|.), popCount, xor, countTrailingZeros)
 --            42  43  44  45  46  47  48
 
 type Index = Int
+
 type BitBoard = Int64
 
-rcToIndex :: Int -> Int -> Index
-rcToIndex r c = 7 * r + c
+--------------------------------------------------------------------------------
+-- I/O
+--------------------------------------------------------------------------------
 
-elemBB :: Index -> BitBoard -> Bool
-elemBB i bb = (bb `shift` (- i)) .&. 1 == 1
+posToIndex :: (Int, Int) -> Index
+posToIndex (r, c) = 7 * r + c
 
-isValidIndex :: Index -> Bool
-isValidIndex i = elemBB i globalMask
+indexToPos :: Index -> (Int, Int)
+indexToPos i = (i `div` 7, i `mod` 7)
 
-getPointSymmetricIndex :: Index -> Index -> Index
-getPointSymmetricIndex center i = center * 2 - i
+showBB :: BitBoard -> String
+showBB bb = unlines [concat [if posToIndex (r, c) `elemBB` bb then "*" else "-" | c <- [1 .. 5]] | r <- [1 .. 5]]
+
+--------------------------------------------------------------------------------
+-- Generators
+--------------------------------------------------------------------------------
+
+singletonBB :: Int -> BitBoard
+singletonBB i = 1 `shift` i
+
+validIndices :: [Index]
+validIndices = [posToIndex (r, c) | r <- [1 .. 5], c <- [1 .. 5]]
+
+-- mask of valid bits (should be 2147077824256)
+globalMask :: BitBoard
+globalMask = sum . map singletonBB $ validIndices
 
 bbToList :: BitBoard -> [Index]
 bbToList bb = tail . map fst $ takeWhile ((/= -1) . fst) $ iterate f (0, bb)
@@ -59,26 +80,38 @@ bbToList bb = tail . map fst $ takeWhile ((/= -1) . fst) $ iterate f (0, bb)
 listToBB :: [Int] -> BitBoard
 listToBB = sum . map singletonBB
 
+--------------------------------------------------------------------------------
+-- Basic Operations
+--------------------------------------------------------------------------------
+
+elemBB :: Index -> BitBoard -> Bool
+elemBB i bb = (bb `shift` (- i)) .&. 1 == 1
+
+andNotBB :: BitBoard -> BitBoard -> BitBoard
+andNotBB bb x = bb .&. complement x
+
+isValidIndex :: Index -> Bool
+isValidIndex i = elemBB i globalMask
+
+getPointSymmetricIndex :: Index -> Index -> Index
+getPointSymmetricIndex center i = center * 2 - i
+
 -- it is user's responsibility to keep bits clean
 countBB :: BitBoard -> Int
 countBB = popCount
 
-singletonBB :: Int -> BitBoard
-singletonBB i = 1 `shift` i
-
--- mask of valid bits (should be 2147077824256)
-globalMask :: BitBoard
-globalMask = sum [singletonBB (rcToIndex r c) | r <- [1..5], c <- [1..5]]
+--------------------------------------------------------------------------------
+-- Neighborhood
+--------------------------------------------------------------------------------
 
 getNeighborhood :: Int -> BitBoard
-getNeighborhood i = x `shift` i `shift` s .&. globalMask
-  where x = 115335 -- listToBB [0, 1, 2, 7, 9, 14, 15, 16]
-        s = -8
+getNeighborhood i = x `shift` (i + s) .&. globalMask
+  where
+    x = 115335 -- listToBB [0, 1, 2, 7, 9, 14, 15, 16]
+    s = -8
 
 getClosedNeighborhood :: BitBoard -> BitBoard
-getClosedNeighborhood bb = let bb' = bb .|. (bb `shift` 1) .|. (bb `shift` (-1))
-                               bb'' = bb' .|. (bb' `shift` 7) .|. (bb' `shift` (-7))
-                            in bb'' .&. globalMask
-
-showBB :: BitBoard -> String
-showBB bb = unlines [concat [if rcToIndex r c `elemBB` bb then "*" else "-" | c <- [1..5]] | r <- [1..5]]
+getClosedNeighborhood bb =
+  let x = bb .|. (bb `shift` 1) .|. (bb `shift` (-1))
+      y = x .|. (x `shift` 7) .|. (x `shift` (-7))
+   in y .&. globalMask
