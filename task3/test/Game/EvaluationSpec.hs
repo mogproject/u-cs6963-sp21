@@ -39,20 +39,21 @@ spec :: Spec
 spec = do
   describe "Evaluation#evaluate()" $ do
     it "finds out end game" $ do
+      -- no available moves
       let s11 = "{\"turn\":8,\"spaces\":[[0,0,2,0,0],[0,0,2,2,2],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],\"players\":[{\"card\":\"Atlas\",\"tokens\":[[1,4],[1,5]]},{\"card\":\"Prometheus\",\"tokens\":[[3,3],[3,4]]}]}"
       let s12 = "{\"turn\":9,\"spaces\":[[0,0,2,0,0],[1,0,2,2,2],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],\"players\":[{\"card\":\"Atlas\",\"tokens\":[[1,4],[1,5]]},{\"card\":\"Prometheus\",\"tokens\":[[3,3],[3,4]]}]}"
 
       eval s11 `shouldBe` -1000000000
-      eval s12 `shouldBe` -1000000000
+      eval s12 `shouldBe` 1000000000
 
     it "prefers building farther from opponent" $ do
       let s1 = "{\"turn\":1,\"spaces\":[[1,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],\"players\":[{\"card\":\"Atlas\",\"tokens\":[[4,5],[5,5]]},{\"card\":\"Prometheus\",\"tokens\":[[1,2],[2,2]]}]}"
       let s2 = "{\"turn\":1,\"spaces\":[[0,0,0,0,0],[1,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],\"players\":[{\"card\":\"Atlas\",\"tokens\":[[4,5],[5,5]]},{\"card\":\"Prometheus\",\"tokens\":[[1,2],[2,2]]}]}"
       let s3 = "{\"turn\":1,\"spaces\":[[0,1,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],\"players\":[{\"card\":\"Atlas\",\"tokens\":[[4,5],[5,5]]},{\"card\":\"Prometheus\",\"tokens\":[[2,1],[2,2]]}]}"
 
-      eval s1 `shouldBe` -256
-      eval s2 `shouldBe` -203
-      eval s3 `shouldBe` -181
+      eval s1 `shouldBe` 256
+      eval s2 `shouldBe` 203
+      eval s3 `shouldBe` 181
 
     it "prefers building next to the boundary" $ do
       let s21 = "{\"turn\":3,\"spaces\":[[1,1,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,1]],\"players\":[{\"card\":\"Atlas\",\"tokens\":[[4,4],[4,5]]},{\"card\":\"Prometheus\",\"tokens\":[[1,1],[2,2]]}]}"
@@ -77,9 +78,9 @@ spec = do
       evaluateAsymmetry' b22 1 `shouldBe` 260
 
       -- s21 is better for Player1
-      evaluate b21 < evaluate b22 `shouldBe` True
-      evaluate b21 `shouldBe` -340
-      evaluate b22 `shouldBe` -313
+      evaluate b21 > evaluate b22 `shouldBe` True
+      evaluate b21 `shouldBe` 340
+      evaluate b22 `shouldBe` 313
 
     it "prefers preventing opponent from climbing up" $ do
       let s31 = "{\"turn\":2,\"spaces\":[[1,0,0,0,0],[0,0,0,0,0],[0,0,0,1,0],[0,0,0,0,0],[0,0,0,0,0]],\"players\":[{\"card\":\"Atlas\",\"tokens\":[[2,1],[2,2]]},{\"card\":\"Prometheus\",\"tokens\":[[2,3],[3,3]]}]}"
@@ -95,16 +96,16 @@ spec = do
       -- printInfo s42
 
       -- s42 is better for Player 1
-      eval s41 > eval s42 `shouldBe` True
+      eval s41 < eval s42 `shouldBe` True
 
       let s43 = "{\"players\":[{\"card\":\"Atlas\",\"tokens\":[[2,2],[4,2]]},{\"card\":\"Prometheus\",\"tokens\":[[4,4],[4,5]]}],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,2]],\"turn\":3}"
       let s44 = "{\"players\":[{\"card\":\"Atlas\",\"tokens\":[[2,2],[4,2]]},{\"card\":\"Prometheus\",\"tokens\":[[4,4],[5,5]]}],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,1],[0,0,1,0,1]],\"turn\":3}"
 
-      -- eval s44 `shouldBe` -2005
+      -- eval s44 `shouldBe` 2005
 
       -- printInfo s43
       -- printInfo s44
-      eval s44 < eval s43 `shouldBe` True
+      eval s44 > eval s43 `shouldBe` True
 
     it "works with several initial positions" $ do
       -- let s51 = "{\"turn\":0,\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],\"players\":[{\"card\":\"Atlas\",\"tokens\":[[4,4],[5,5]]},{\"card\":\"Prometheus\",\"tokens\":[[1,1],[2,2]]}]}"

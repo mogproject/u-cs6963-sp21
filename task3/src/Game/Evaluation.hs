@@ -18,14 +18,15 @@ import qualified Data.Map
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Vector.Unboxed as V
+import Game.BitBoard
 import Game.GameMove
 import Game.GameState
   ( AdjList,
     Cards,
     GameState (GameState),
     Index,
-    Levels,
     LevelMap,
+    Levels,
     Players,
     cards,
     legalMoves,
@@ -35,7 +36,6 @@ import Game.GameState
     players,
     turn,
   )
-import Game.BitBoard
 
 --------------------------------------------------------------------------------
 -- Types
@@ -69,14 +69,14 @@ evalReachTable =
         [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
         [300, 200, 40, 30, 20, 15, 12, 0], -- level 1
         [10000, 2000, 500, 200, 150, 120, 110, 0], -- level 2
-        [scoreWin, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3
+        [0, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3 (staying at lv 3 is not advantageous)
         [0, 0, 0, 0, 0, 0, 0, 0], -- level 4
 
         -- not turn to move
         [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
         [300, 100, 40, 30, 20, 15, 12, 0], -- level 1
         [10000, 1000, 500, 200, 150, 120, 110, 0], -- level 2
-        [scoreWin, 10000, 5000, 2000, 1000, 500, 300, 0], -- level 3
+        [0, 10000, 5000, 2000, 1000, 500, 300, 0], -- level 3
         [0, 0, 0, 0, 0, 0, 0, 0] -- level 4
       ]
 
@@ -162,7 +162,7 @@ evaluate
     { cards = cs,
       players = pl,
       levels = lv,
-      turn = _,
+      turn = t,
       levelMap = lm,
       moveAdjacency = adj,
       legalMoves = _
@@ -178,17 +178,20 @@ evaluate
               evaluatePrevention pl lv lm bestDist,
               evaluatePanBonus cs pl lv
             ]
-       in sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
+       in sign * sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
+    where
+      sign = if even t then 1 else -1
 
 evaluate' :: GameState -> (Maybe Score, Maybe GameMove)
 evaluate'
-  GameState {legalMoves = mv}
-    | opponentWin = (Just (- scoreWin), Nothing)
-    | canWin = (Just scoreWin, Just (head mv)) -- moves must be sorted
+  GameState {turn = t, legalMoves = mv}
+    | hasLost = (Just (sign * (- scoreWin)), Nothing)
+    | canWin = (Just (sign * scoreWin), Just (head mv)) -- moves must be sorted
     | otherwise = (Nothing, Nothing)
     where
-      opponentWin = null mv
+      hasLost = null mv
       canWin = getWin $ head mv
+      sign = if even t then 1 else -1
 
 -- (1) Worker Proximity
 evaluateWorkerProximity :: Players -> [[Map Index Int]] -> Int -> Score

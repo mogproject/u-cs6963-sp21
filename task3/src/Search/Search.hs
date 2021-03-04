@@ -1,23 +1,53 @@
-module Search.Search (findMove) where
+module Search.Search (findMove, searchAlphaBeta, findMoveAlphaBeta) where
 
--- import Data.Function (on)
-import Data.List (maximumBy, minimumBy, sortBy)
--- import Data.Map ((!))
+import Data.List (maximumBy, minimumBy)
+import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 import Game.Evaluation (Score, evaluate, evaluate', scoreWin)
-import Game.GameState (GameMove, GameState (GameState), makeMove)
+import Game.GameMove
+import Game.GameState (GameMove, GameState (GameState), getLegalMoves', makeMove)
 import qualified Game.GameState as GS
 
 findMove :: Int -> Int -> GameState -> GameMove
+-- Only one choise
+findMove _ _ GameState {GS.legalMoves = [m]} = m
 -- Naive: choose the first legal move
-findMove strategy _ GameState {GS.legalMoves = mv} | strategy == 1 && not (null mv) = head mv
+findMove 1 _ GameState {GS.legalMoves = m : _} = m
 -- Minimax
-findMove strategy _ g@GameState {GS.legalMoves = mv} | strategy == 2 && not (null mv) = searchMiniMax g 2
+findMove 2 _ g@GameState {GS.legalMoves = _ : _} =
+  let depth = 2
+   in searchMiniMax g depth
+-- Alpha-beta (generic): Do not use. Why is this so slow?
+findMove 3 _ g = getNextMove g $ findMoveAlphaBeta g 3
 -- Alpha-beta
-findMove strategy _ g@GameState {GS.legalMoves = mv} | strategy == 3 && not (null mv) = searchAlphaBetaNaive g 3
--- Alpha-beta with reordering
-findMove strategy _ g@GameState {GS.legalMoves = mv} | strategy == 4 && not (null mv) = searchAlphaBetaReordering g 3
+findMove 4 _ g@GameState {GS.turn = t} = searchAlphaBetaNaive g (even t) 3
+--
 findMove _ _ _ = undefined
+
+--------------------------------------------------------------------------------
+-- Wrappers
+--------------------------------------------------------------------------------
+
+type SearchNode = (GameState, Maybe GameMove)
+
+createRoot :: GameState -> SearchNode
+createRoot s = (s, Nothing)
+
+createBranches :: SearchNode -> [SearchNode]
+createBranches (s@GameState {GS.legalMoves = mv}, _) =
+  case evaluate' s of
+    (Just _, _) -> [] -- has a conclusion
+    (_, _) -> [(GS.makeMove s m, Just m) | m <- mv, not (getWin m)]
+
+scoreNode :: SearchNode -> Score
+scoreNode = evaluate . fst
+
+getNextMove :: GameState -> (Score, [SearchNode]) -> GameMove
+getNextMove s (_, xs) = if null xs then head (getLegalMoves' False s) else fromMaybe undefined $ (last . map snd) xs
+
+findMoveAlphaBeta :: GameState -> Int -> (Score, [SearchNode])
+findMoveAlphaBeta g@GameState {GS.turn = t, GS.legalMoves = _ : _} depth = searchAlphaBeta createBranches scoreNode (- scoreWin) scoreWin (createRoot g) (even t) depth
+findMoveAlphaBeta GameState {GS.turn = t, GS.legalMoves = []} _ = (if even t then - scoreWin else scoreWin, [])
 
 --------------------------------------------------------------------------------
 -- Minimax Search
@@ -42,19 +72,20 @@ searchMiniMax' g@GameState {GS.legalMoves = mv} depth shouldMaximize sofar =
 -- Alpha-beta Search
 --------------------------------------------------------------------------------
 
-searchAlphaBetaNaive :: GameState -> Int -> GameMove
-searchAlphaBetaNaive g depth = last . snd $ searchAlphaBetaNaive' g depth (- scoreWin - 1) (scoreWin + 1) True []
+searchAlphaBetaNaive :: GameState -> Bool -> Int -> GameMove
+searchAlphaBetaNaive g maximize depth =
+  let (_, result) = searchAlphaBetaNaive' g depth (- scoreWin - 1) (scoreWin + 1) maximize []
+   in if null result then head (getLegalMoves' False g) else last result
 
 searchAlphaBetaNaive' :: GameState -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove])
 -- reached depth limit
-searchAlphaBetaNaive' g depth _ _ shouldMaximize sofar
-  | depth == 0 =
-    ((if shouldMaximize then 1 else -1) * evaluate g, sofar)
+searchAlphaBetaNaive' g depth _ _ _ sofar
+  | depth == 0 = (evaluate g, sofar)
 --
 searchAlphaBetaNaive' g@GameState {GS.legalMoves = mv} depth alpha beta shouldMaximize sofar =
   case evaluate' g of
-    (Just sc, Nothing) -> ((if shouldMaximize then 1 else -1) * sc, sofar) -- terminal node
-    (Just sc, Just m) -> ((if shouldMaximize then 1 else -1) * sc, m : sofar) -- terminal node
+    (Just sc, Nothing) -> (sc, sofar) -- terminal node
+    (Just sc, Just m) -> (sc, m : sofar) -- terminal node
     (Nothing, _) ->
       let nextStates = fmap (makeMove g) mv
           bestScore = if shouldMaximize then - scoreWin - 1 else scoreWin + 1
@@ -74,36 +105,31 @@ searchAlphaBetaNaive'' ((mv, st) : gs) depth alpha beta shouldMaximize sofar (be
             else searchAlphaBetaNaive'' gs depth alpha' beta' shouldMaximize sofar best'
         else searchAlphaBetaNaive'' gs depth alpha beta shouldMaximize sofar (bestScore, bestMove)
 
--- Alpha-beta with reordering heuristic
-searchAlphaBetaReordering :: GameState -> Int -> GameMove
-searchAlphaBetaReordering g depth = last . snd $ searchAlphaBetaReordering' g depth (- scoreWin - 1) (scoreWin + 1) True []
+--------------------------------------------------------------------------------
+-- Alpha-beta Search (Generic)
+--------------------------------------------------------------------------------
 
-searchAlphaBetaReordering' :: GameState -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove])
--- reached depth limit
-searchAlphaBetaReordering' g depth _ _ shouldMaximize sofar
-  | depth == 0 =
-    ((if shouldMaximize then 1 else -1) * evaluate g, sofar)
---
-searchAlphaBetaReordering' g@GameState {GS.legalMoves = mv} depth alpha beta shouldMaximize sofar =
-  case evaluate' g of
-    (Just sc, Nothing) -> ((if shouldMaximize then 1 else -1) * sc, sofar) -- terminal node
-    (Just sc, Just m) -> ((if shouldMaximize then 1 else -1) * sc, m : sofar) -- terminal node
-    (Nothing, _) ->
-      -- FIXME: cache evaluation results
-      let nextStates = sortBy (comparing ((if shouldMaximize then negate else id) . fst)) [(evaluate st, (m, st)) | m <- mv, let st = makeMove g m]
-          bestScore = if shouldMaximize then - scoreWin - 1 else scoreWin + 1
-       in searchAlphaBetaReordering'' (map snd nextStates) depth alpha beta shouldMaximize sofar (bestScore, [])
+searchAlphaBeta :: Ord score => (node -> [node]) -> (node -> score) -> score -> score -> node -> Bool -> Int -> (score, [node])
+searchAlphaBeta branch score minValue maxValue root maximize depth = searchAlphaBeta' root branch score depth minValue maxValue maximize []
 
-searchAlphaBetaReordering'' :: [(GameMove, GameState)] -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove]) -> (Score, [GameMove])
-searchAlphaBetaReordering'' [] _ _ _ _ _ best = best
-searchAlphaBetaReordering'' ((mv, st) : gs) depth alpha beta shouldMaximize sofar (bestScore, bestMove) =
-  let (value, moves) = searchAlphaBetaReordering' st (depth -1) alpha beta (not shouldMaximize) (mv : sofar)
-   in if (shouldMaximize && value > bestScore) || (not shouldMaximize && value < bestScore)
-        then do
-          let best' = (value, moves)
-          let alpha' = if shouldMaximize then max alpha value else alpha
-          let beta' = if shouldMaximize then beta else min beta value
-          if beta' <= alpha'
-            then best' -- cutoff
-            else searchAlphaBetaReordering'' gs depth alpha' beta' shouldMaximize sofar best'
-        else searchAlphaBetaReordering'' gs depth alpha beta shouldMaximize sofar (bestScore, bestMove)
+-- move vertically to the next level
+searchAlphaBeta' :: Ord score => node -> (node -> [node]) -> (node -> score) -> Int -> score -> score -> Bool -> [node] -> (score, [node])
+searchAlphaBeta' root _ score depth _ _ _ sofar | depth <= 0 = (score root, sofar) -- depth limit
+searchAlphaBeta' root branch score depth alpha beta maximize sofar =
+  case branch root of
+    [] -> (score root, sofar) -- leaf node
+    xs ->
+      let f = (\x -> searchAlphaBeta' x branch score (depth - 1) alpha beta (not maximize) (x : sofar))
+       in searchAlphaBeta'' f xs alpha beta maximize sofar Nothing
+
+-- move horizontally to the next candidate
+searchAlphaBeta'' :: Ord score => (node -> (score, [node])) -> [node] -> score -> score -> Bool -> [node] -> Maybe (score, [node]) -> (score, [node])
+searchAlphaBeta'' f (x : xs) alpha beta maximize sofar best =
+  let best'@(z, _) = f x
+   in if maybe True (\(y, _) -> (if maximize then (>) else (<)) z y) best -- best value updated
+        then
+          let (alpha', beta') = if maximize then (max alpha z, beta) else (alpha, min beta z)
+           in if beta' <= alpha' then best' else searchAlphaBeta'' f xs alpha' beta' maximize sofar (Just best')
+        else searchAlphaBeta'' f xs alpha beta maximize sofar best
+searchAlphaBeta'' _ [] _ _ _ _ (Just best) = best -- examined all candidates
+searchAlphaBeta'' _ [] _ _ _ _ _ = undefined -- never happens

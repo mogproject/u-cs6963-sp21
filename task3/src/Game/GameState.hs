@@ -19,11 +19,13 @@ module Game.GameState
     Levels,
     LevelMap,
     AdjList,
+    getLegalMoves',
     getLegalMoveTo,
     getLegalBuildAt,
   )
 where
 
+import Control.Monad (guard)
 import Data.Bits (complement, shift, xor, (.&.), (.|.))
 import Data.Board (Board (Board), Level, Player (Player))
 import qualified Data.Board
@@ -220,8 +222,19 @@ getLegalBuildAt _ lv emptySpace _ mt = [[(bl, (lv ! bl) + 1)] | bl <- bbToList $
 -- All legal moves
 --------------------------------------------------------------------------------
 
+getLegalMoves' :: Bool -> GameState -> [GameMove]
+getLegalMoves'
+  effectiveOnly
+  GameState
+    { cards = cs,
+      players = ps,
+      levels = lv,
+      levelMap = lm,
+      moveAdjacency = adj
+    } = getLegalMoves effectiveOnly cs ps lv lm adj
+
 getLegalMoves :: Bool -> Cards -> Players -> Levels -> LevelMap -> AdjList -> [GameMove]
-getLegalMoves effectiveOnly (c1 : _) pl lv lm adj =
+getLegalMoves effectiveOnly [c1, c2] pl lv lm adj =
   let allMoves = do
         wk <- [0, 1]
         let mf = pl !! 0 !! wk -- move from
@@ -257,9 +270,27 @@ getLegalMoves effectiveOnly (c1 : _) pl lv lm adj =
             -- check point 2
             let moveSofar' = setBuildAt bls moveSofar
 
-            -- move evaluation
-            -- TODO: Implement
-            return moveSofar'
+            -- check next levels
+            let (lv', lm') =
+                  foldl
+                    ( \(xlv, xlm) (bl, nextLevel) ->
+                        let prevLevel = xlv ! bl
+                            f = Data.Map.adjust (xor (singletonBB bl)) -- toggle bl bit
+                            xlv' = Data.Map.insert bl nextLevel xlv
+                            xlm' = f nextLevel $ f prevLevel xlm
+                         in (xlv', xlm')
+                    )
+                    (lv, lm)
+                    bls
+
+            -- evaluation
+            if isLosingMove c2 (pl !! 1) lv' lm'
+              then do
+                let moveSofar'' = setLose moveSofar'
+                guard $ not effectiveOnly
+                return moveSofar''
+              else -- TODO: Implement
+                return moveSofar'
    in if effectiveOnly
         then case find getWin allMoves of
           Just m -> [m] -- one winning move is enough
@@ -268,12 +299,13 @@ getLegalMoves effectiveOnly (c1 : _) pl lv lm adj =
 getLegalMoves _ _ _ _ _ _ = undefined
 
 isWinningMove :: Maybe Card -> Index -> Index -> Levels -> LevelMap -> Bool
-isWinningMove (Just Artemis) mf mt lv lm =
-  (lv ! mt) == 3 && (lv ! mf) == 3
-    && (getNeighborhood mf .&. getNeighborhood mt .&. (lm ! 2) /= 0)
-    || isWinningMove Nothing mf mt lv lm
+-- Artemis' move lv 3 -> lv 2 -> lv 3
+isWinningMove (Just Artemis) mf mt lv lm | (lv ! mt) == 3 && (lv ! mf) == 3 = getNeighborhood mf .&. getNeighborhood mt .&. (lm ! 2) /= 0
 isWinningMove (Just Pan) mf mt lv lm = (lv ! mt) + 2 <= (lv ! mf) || isWinningMove Nothing mf mt lv lm
 isWinningMove _ mf mt lv _ = (lv ! mt) == 3 && (lv ! mf) < 3
+
+isLosingMove :: Maybe Card -> [Index] -> Levels -> LevelMap -> Bool
+isLosingMove _ pl _ lm = getClosedNeighborhood (listToBB pl .&. lm ! 2) .&. lm ! 3 /= 0
 
 makeMove :: GameState -> GameMove -> GameState
 makeMove

@@ -1,5 +1,6 @@
 module Game.GameMove
   ( GameMove,
+    showMove,
     createGameMove,
     setWorkerId,
     getWorkerId,
@@ -23,6 +24,7 @@ where
 
 import Data.Bits (complement, shift, (.&.), (.|.))
 import Data.Int (Int64)
+import Game.BitBoard (indexToPos)
 
 type GameMove = Int64
 
@@ -52,7 +54,24 @@ type GameMove = Int64
 --                                                                 xxxxxx | mv from  | 8-40: index move from
 --                                                                       x| wid      | 0: worker 1; 1: worker 2
 
-createGameMove :: Int64
+showMove :: GameMove -> String
+showMove x =
+  let workerId = (show . (+ 1) . getWorkerId) x
+      moveFrom = (show . indexToPos . getMoveFrom) x
+      moveTo = (show . indexToPos . getMoveTo) x
+      builds = unwords ["(" ++ (show . indexToPos) buildAt ++ ", lv=" ++ show lv ++ ")" | (buildAt, lv) <- getBuildAt x]
+   in concat
+        [ "Worker[",
+          workerId,
+          "]@",
+          moveFrom,
+          " -> ",
+          moveTo,
+          ": ",
+          builds
+        ]
+
+createGameMove :: GameMove
 createGameMove = setValue 46 1 0 $ (((1 :: Int64) `shift` 31) - 1) `shift` 32
 
 getMask :: Int -> Int -> Int64
