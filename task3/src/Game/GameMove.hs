@@ -36,14 +36,15 @@ type GameMove = Int64
 -- 63    56 55    48 47    40 39    32 31    24 23    16 15     8 7      0
 -- =======================================================================|
 -- 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000|
---                   x                                                    | win      | 0: winning move; 1: otherwise
---                    x                                                   | lose     | 0: otherwise; 1: losing move
---                     x                                                  | defence  | 0: disables at least one of the opponent's winning moves; 1: otherwise
---                      x                                                 | step bld | 0: build that enables my worker to move up; 1: otherwise
---                       x                                                | block bld| 0: build that disables one of the opponent's moving up; 1: otherwise
---                        xxx                                             | mv to lv | 7 - (move to level)
---                            xxx                                         | bld lv(2)| 7 - (level after build(2))
---                               xxx                                      | bld lv(1)| 7 - (level after build(1))
+--  x                                                                     | win      | 0: winning move; 1: otherwise
+--   x                                                                    | lose     | 0: otherwise; 1: losing move
+--       x                                                                | step bld | 0: build that enables my worker to move up; 1: otherwise
+--        x                                                               | block bld| 0: build that disables one of the opponent's moving up; 1: otherwise
+--          xxx                                                           | mv to lv | 7 - (move to level)
+--                     xxx                                                | bld lv(2)| 7 - (level after build(2))
+--                        xxx                                             | bld bl(2)| level before build(2)
+--                            xxx                                         | bld lv(1)| 7 - (level after build(1))
+--                               xxx                                      | bld bl(1)| level bfter build(1)
 --                                  x                                     | dbl mv   | 0: double move; 1: otherwise
 --                                   x                                    | mv op    | 0: opponent worker is pushed or swapped; 1: otherwise
 --                                     xxxxxx                             | op mv to | 8-40: opponnet worker move to
@@ -59,7 +60,7 @@ showMove x =
   let workerId = (show . (+ 1) . getWorkerId) x
       moveFrom = (show . indexToPos . getMoveFrom) x
       moveTo = (show . indexToPos . getMoveTo) x
-      builds = unwords ["(" ++ (show . indexToPos) buildAt ++ ", lv=" ++ show lv ++ ")" | (buildAt, lv) <- getBuildAt x]
+      builds = unwords ["(" ++ (show . indexToPos) buildAt ++ ", lv=" ++ show lv ++ ")" | (buildAt, _, lv) <- getBuildAt x]
    in concat
         [ "Worker[",
           workerId,
@@ -101,24 +102,27 @@ setMoveTo = setValue 7 6
 getMoveTo :: Int64 -> Int
 getMoveTo = getValue 7 6
 
-setBuildAt :: [(Int, Int)] -> Int64 -> Int64
-setBuildAt [(bl, bll)] = setValue 13 6 bl . setValue 34 3 (7 - bll)
-setBuildAt [(bl1, bll1), (bl2, bll2)] = (setValue 19 6 bl2 . setValue 37 3 (7 - bll2)) . setBuildAt [(bl1, bll1)]
+setBuildAt :: [(Int, Int, Int)] -> Int64 -> Int64
+setBuildAt [(bl, blb, bll)] = setValue 13 6 bl . setValue 34 3 blb . setValue 37 3 (7 - bll)
+setBuildAt [(bl1, blb1, bll1), (bl2, blb2, bll2)] =
+  (setValue 19 6 bl2 . setValue 40 3 blb2 . setValue 43 3 (7 - bll2)) . setBuildAt [(bl1, blb1, bll1)]
 setBuildAt _ = undefined
 
-getBuildAt :: Int64 -> [(Int, Int)]
+getBuildAt :: Int64 -> [(Int, Int, Int)]
 getBuildAt x =
-  let bll1 = 7 - getValue 34 3 x
+  let blb1 = getValue 34 3 x
+      bll1 = 7 - getValue 37 3 x
    in if bll1 == 0
         then []
         else
-          let bll2 = 7 - getValue 37 3 x
+          let blb2 = getValue 40 3 x
+              bll2 = 7 - getValue 43 3 x
            in if bll2 == 0
-                then [(getValue 13 6 x, bll1)]
-                else [(getValue 13 6 x, bll1), (getValue 19 6 x, bll2)]
+                then [(getValue 13 6 x, blb1, bll1)]
+                else [(getValue 13 6 x, blb1, bll1), (getValue 19 6 x, blb2, bll2)]
 
 setMoveToLevel :: Int -> Int64 -> Int64
-setMoveToLevel lv = setValue 40 3 (7 - lv)
+setMoveToLevel lv = setValue 52 3 (7 - lv)
 
 setOpponentMove :: Int -> Int -> Int64 -> Int64
 setOpponentMove wid moveTo = setValue 32 1 0 . setValue 26 6 moveTo . setValue 25 1 wid
@@ -131,16 +135,16 @@ getOpponentMove x =
     else (-1, 0)
 
 setWin :: Int64 -> Int64
-setWin = setValue 47 1 0
+setWin = setValue 62 1 0
 
 getWin :: Int64 -> Bool
-getWin x = getValue 47 1 x == 0
+getWin x = getValue 62 1 x == 0
 
 setLose :: Int64 -> Int64
-setLose = setValue 46 1 1
+setLose = setValue 61 1 1
 
 getLose :: Int64 -> Bool
-getLose x = getValue 46 1 x == 1
+getLose x = getValue 61 1 x == 1
 
 setDoubleMove :: Int64 -> Int64
 setDoubleMove = setValue 33 1 0

@@ -21,4 +21,4 @@ spec = do
       -- print $ setBuildAt [(24, 2)] x
       getBuildAt (-1 :: Int64) `shouldBe` []
       getBuildAt x `shouldBe` []
-      (getBuildAt . setBuildAt [(24, 2)]) x `shouldBe` [(24, 2)]
+      (getBuildAt . setBuildAt [(24, 1, 2)]) x `shouldBe` [(24, 1, 2)]

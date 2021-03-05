@@ -42,7 +42,8 @@ getLegalBuildAt' b wk moveFrom =
           levelMap = lm
         } = fromBoard b
       emptySpace = ((lm ! 7) `andNotBB` (pm ! 6)) .|. singletonBB (pl !! 0 !! wk)
-   in getLegalBuildAt (cs !! 0) lv emptySpace moveFrom (pl !! 0 !! wk)
+      result = getLegalBuildAt (cs !! 0) lv emptySpace moveFrom (pl !! 0 !! wk)
+   in [[(x, z) | (x, _, z) <- r] | r <- result]
 
 spec :: Spec
 spec = do

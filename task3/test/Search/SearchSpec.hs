@@ -75,7 +75,7 @@ spec = do
 
       getMoveFrom mv `shouldBe` posToIndex (4, 5)
       getMoveTo mv `shouldBe` posToIndex (5, 4)
-      getBuildAt mv `shouldBe` [(posToIndex (4, 3), 3)]
+      getBuildAt mv `shouldBe` [(posToIndex (4, 3), 2, 3)]
 
     it "does not make a losing move" $ do
       -- Player 1 (Demeter) is destined to lose
@@ -109,8 +109,8 @@ spec = do
       getMoveFrom mv `shouldBe` posToIndex (1, 5)
       getMoveTo mv `shouldBe` posToIndex (2, 4)
       let builds = getBuildAt mv
-      builds `shouldContain` [(posToIndex (3, 4), 4)]
-      builds `shouldNotContain` [(posToIndex (1, 5), 3)] -- losing build
+      builds `shouldContain` [(posToIndex (3, 4), 3, 4)]
+      builds `shouldNotContain` [(posToIndex (1, 5), 2, 3)] -- losing build
   describe "Search#searchAlphaBeta()" $ do
     it "finds the best move" $ do
       let nodes =

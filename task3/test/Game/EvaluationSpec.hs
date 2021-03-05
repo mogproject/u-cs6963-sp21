@@ -131,7 +131,7 @@ spec = do
       let b52 = fromBoard (fromMaybe undefined (readBoard s52))
 
       -- worker 2, (5,4) -> (4,5) build (5,5)
-      let b52' = makeMove b52 $ (setWorkerId 1 . setMoveFrom 39 . setMoveTo 33 . setBuildAt [(40, 2)]) createGameMove
+      let b52' = makeMove b52 $ (setWorkerId 1 . setMoveFrom 39 . setMoveTo 33 . setBuildAt [(40, 1, 2)]) createGameMove
 
       let s53 = "{\"players\":[{\"card\":\"Prometheus\",\"tokens\":[[2,2],[4,2]]},{\"card\":\"Atlas\",\"tokens\":[[4,4],[4,5]]}],\"spaces\":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,1,0,2]],\"turn\":3}"
       let b53 = fromBoard (fromMaybe undefined (readBoard s53))

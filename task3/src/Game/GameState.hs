@@ -208,14 +208,14 @@ combinations :: Int -> [a] -> [[a]]
 combinations 0 _ = [[]]
 combinations n xs = [y : ys | y : xs' <- tails xs, ys <- combinations (n -1) xs']
 
-getLegalBuildAt :: Maybe Card -> Levels -> BitBoard -> Index -> Index -> [[(Index, Level)]]
+getLegalBuildAt :: Maybe Card -> Levels -> BitBoard -> Index -> Index -> [[(Index, Level, Level)]]
 --
 -- [Atlas]
 -- The build phase can build a space currently at level 0, 1, 2 to make it level 4,
 -- instead of building to exactly one more than the space’s current level.
 getLegalBuildAt (Just Atlas) lv emptySpace _ mt =
   let hs l = if l == 3 then [4] else [l + 1, 4]
-   in [[(bl, h)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace, h <- hs (lv ! bl)]
+   in [[(bl, lv ! bl, h)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace, h <- hs (lv ! bl)]
 --
 -- [Demeter]
 -- The moved token can optionally build a second time, but not on the same space
@@ -223,14 +223,14 @@ getLegalBuildAt (Just Atlas) lv emptySpace _ mt =
 getLegalBuildAt (Just Demeter) lv emptySpace _ mt =
   let cand = bbToList $ getNeighborhood mt .&. emptySpace
       comb = [[x] | x <- cand] ++ combinations 2 cand
-   in [[(x, (lv ! x) + 1) | x <- xs] | xs <- comb]
+   in [[(x, lv ! x, (lv ! x) + 1) | x <- xs] | xs <- comb]
 --
 -- [Hephastus]
 -- The moved token can optionally build a second time, but only on the same space
 -- as the first build within a turn, and only if the second build does not reach level 4.
 getLegalBuildAt (Just Hephastus) lv emptySpace _ mt =
   let hs l = if l <= 1 then [l + 1, l + 2] else [l + 1]
-   in [[(bl, h)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace, h <- hs (lv ! bl)]
+   in [[(bl, lv ! bl, h)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace, h <- hs (lv ! bl)]
 --
 -- [Prometheus]
 -- A token can optionally build before moving, but then the move is constrained to
@@ -242,14 +242,14 @@ getLegalBuildAt (Just Prometheus) lv emptySpace mf mt
         forbidden = if (lv ! mf) == (lv ! mt) then complement (1 `shift` mt) else -1
         firstBuild = bbToList $ getNeighborhood mf .&. emptySpace .&. forbidden
      in getLegalBuildAt Nothing lv emptySpace mf mt
-          ++ [ if x == y then [(x, (lv ! x) + 2)] else [(x, (lv ! x) + 1), (y, (lv ! y) + 1)]
+          ++ [ if x == y then [(x, lv ! x, (lv ! x) + 2)] else [(x, lv ! x, (lv ! x) + 1), (y, lv ! y, (lv ! y) + 1)]
                | x <- secondBuild,
                  y <- firstBuild,
                  x /= y || lv ! x <= 2
              ]
 --
 -- Others.
-getLegalBuildAt _ lv emptySpace _ mt = [[(bl, (lv ! bl) + 1)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace]
+getLegalBuildAt _ lv emptySpace _ mt = [[(bl, lv ! bl, (lv ! bl) + 1)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace]
 
 --------------------------------------------------------------------------------
 -- All legal moves
@@ -287,7 +287,7 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
         let pm'' = maybe id (\(wid, _) mm -> foldl (flip (Data.Map.adjust (xor pushDiff))) mm [2 + wid, 5, 6]) pushInfo pm'
 
         -- check point 1
-        let moveSofar = (applyPushTo . applyDoubleMove . setMoveToLevel (lv ! mt) . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
+        let moveSofar = (applyPushTo . applyDoubleMove . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
 
         -- check winning
         -- Note: it's possible for Artemis to win by moving like 1->2->3 or 3->2->3
@@ -299,12 +299,12 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
             let emptySpace = ((lm ! 7) `andNotBB` (pm'' ! 6)) .|. singletonBB mt
             bls <- getLegalBuildAt c1 lv emptySpace mf mt
 
-            -- check point 2
-            let moveSofar' = setBuildAt bls moveSofar
-
             -- check next levels
-            -- let lv' = makeNextLevels lv bls
-            let lm' = makeNextLevelMap lv lm bls
+            let lv' = makeNextLevels lv bls
+            let lm' = makeNextLevelMap lm bls
+
+            -- check point 2
+            let moveSofar' = (setMoveToLevel (lv' ! mt) . setBuildAt bls) moveSofar
 
             -- evaluation
             if hasWinningMove c2 1 pm'' lm'
@@ -312,7 +312,8 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
                 let moveSofar'' = setLose moveSofar'
                 guard $ not effectiveOnly
                 return moveSofar''
-              else -- TODO: Implement
+              else do
+                -- TODO: Implement
                 return moveSofar'
    in if effectiveOnly
         then case find getWin allMoves of
@@ -366,16 +367,15 @@ makeNextPlayers [p1, p2] mv =
    in [p2', p1']
 makeNextPlayers _ _ = undefined
 
-makeNextLevels :: Levels -> [(Index, Level)] -> Levels
-makeNextLevels = foldl (\xlv (bl, nextLevel) -> Data.Map.insert bl nextLevel xlv)
+makeNextLevels :: Levels -> [(Index, Level, Level)] -> Levels
+makeNextLevels = foldl (\xlv (bl, _, nextLevel) -> Data.Map.insert bl nextLevel xlv)
 
 -- most time-consuming?
-makeNextLevelMap :: Levels -> LevelMap -> [(Index, Level)] -> LevelMap
-makeNextLevelMap lv =
+makeNextLevelMap :: LevelMap -> [(Index, Level, Level)] -> LevelMap
+makeNextLevelMap =
   foldl
-    ( \xlm (bl, nextLevel) ->
-        let prevLevel = lv ! bl
-            f = Data.Map.adjust (xor (singletonBB bl))
+    ( \xlm (bl, prevLevel, nextLevel) ->
+        let f = Data.Map.adjust (xor (singletonBB bl))
             rng = [(max 5 (prevLevel + 4)) .. (nextLevel + 3)] -- cumulative info
          in foldl (flip f) xlm $ [prevLevel, nextLevel] ++ rng
     )
@@ -397,7 +397,7 @@ makeMove
         pm' = createPlayerMap pl'
         builds = getBuildAt mv
         lv' = makeNextLevels lv builds
-        lm' = makeNextLevelMap lv lm builds
+        lm' = makeNextLevelMap lm builds
         mv' = getLegalMoves True cs' pl' pm' lv' lm'
      in GameState {cards = cs', players = pl', playerMap = pm', levels = lv', turn = t', levelMap = lm', legalMoves = mv'}
 makeMove _ _ = undefined
