@@ -5,7 +5,7 @@ import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 import Game.Evaluation (Score, evaluate, evaluate', scoreWin)
 import Game.GameMove
-import Game.GameState (GameMove, GameState (GameState), getLegalMoves', makeMove)
+import Game.GameState (GameState (GameState), getLegalMoves', makeMove)
 import qualified Game.GameState as GS
 
 findMove :: Int -> Int -> GameState -> GameMove
