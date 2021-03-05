@@ -1,1 +1,7 @@
 resolver: lts-17.2
+
+ghc-options:
+  # "$locals": -Werror
+  # "$locals": -fspecialise-aggressively
+  # "$targets": -Werror
+  "$everything": -O2

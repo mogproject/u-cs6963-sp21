@@ -22,6 +22,7 @@ where
 
 import Data.Bits (Bits (complement), countTrailingZeros, popCount, shift, xor, (.&.), (.|.))
 import Data.Int (Int64)
+import Data.List (foldl')
 
 -- Bitwise representation of the board
 --
@@ -60,6 +61,7 @@ showBB bb = unlines [concat [if posToIndex (r, c) `elemBB` bb then "*" else "-" 
 
 singletonBB :: Int -> BitBoard
 singletonBB i = 1 `shift` i
+{-# INLINABLE singletonBB #-}
 
 validIndices :: [Index]
 validIndices = [posToIndex (r, c) | r <- [1 .. 5], c <- [1 .. 5]]
@@ -78,8 +80,9 @@ bbToList bb = tail . map fst $ takeWhile ((/= -1) . fst) $ iterate f (0, bb)
           let p = countTrailingZeros y
            in (p, y `xor` (1 `shift` p))
 
+-- Note: faster than using sum and map
 listToBB :: [Int] -> BitBoard
-listToBB = sum . map singletonBB
+listToBB = foldl' (\z x -> z .|. singletonBB x) 0
 
 --------------------------------------------------------------------------------
 -- Basic Operations
@@ -87,9 +90,11 @@ listToBB = sum . map singletonBB
 
 elemBB :: Index -> BitBoard -> Bool
 elemBB i bb = (bb `shift` (- i)) .&. 1 == 1
+{-# INLINABLE elemBB #-}
 
 andNotBB :: BitBoard -> BitBoard -> BitBoard
 andNotBB bb x = bb .&. complement x
+{-# INLINABLE andNotBB #-}
 
 isValidIndex :: Index -> Bool
 isValidIndex i = elemBB i globalMask

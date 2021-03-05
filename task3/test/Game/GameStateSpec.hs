@@ -4,8 +4,8 @@ import Data.Bits (Bits ((.&.), (.|.)))
 import Data.Board (readBoard)
 import qualified Data.Board as B
 import Data.Card
-import Data.Map ((!))
-import qualified Data.Map
+import Data.IntMap (IntMap, (!))
+import qualified Data.IntMap as Map
 import Data.Maybe (fromMaybe)
 import Game.BitBoard
 import Game.GameState
@@ -509,7 +509,7 @@ spec = do
       let pm1 = createPlayerMap [[ri 1 3, ri 3 4], [ri 2 3, ri 4 5]]
       let pm1' = createPlayerMap [[ri 2 3, ri 4 5], [ri 1 3, ri 3 4]]
       let lv =
-            Data.Map.fromList $
+            Map.fromList $
               (zip validIndices . concat)
                 [ [3, 0, 3, 1, 2],
                   [2, 4, 2, 0, 1],
@@ -530,7 +530,7 @@ spec = do
       let pm1 = createPlayerMap [[ri 1 4, ri 3 3], [ri 2 3, ri 4 5]]
       let pm1' = createPlayerMap [[ri 2 3, ri 4 5], [ri 1 4, ri 3 3]]
       let lv =
-            Data.Map.fromList $
+            Map.fromList $
               (zip validIndices . concat)
                 [ [3, 0, 3, 1, 2],
                   [2, 4, 2, 0, 1],

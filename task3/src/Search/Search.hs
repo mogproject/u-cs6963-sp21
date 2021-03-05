@@ -18,9 +18,9 @@ findMove 2 _ g@GameState {GS.legalMoves = _ : _} =
   let depth = 2
    in searchMiniMax g depth
 -- Alpha-beta (generic): Do not use. Why is this so slow?
-findMove 3 _ g = getNextMove g $ findMoveAlphaBeta g 3
+findMove 3 _ g = getNextMove g $ findMoveAlphaBeta g 2
 -- Alpha-beta
-findMove 4 _ g = searchAlphaBetaNaive g 3
+findMove 4 _ g = searchAlphaBetaNaive g 4
 --
 findMove _ _ _ = undefined
 
@@ -74,7 +74,7 @@ searchMiniMax' g@GameState {GS.legalMoves = mv} depth shouldMaximize sofar =
 
 searchAlphaBetaNaive :: GameState -> Int -> GameMove
 searchAlphaBetaNaive g@GameState {GS.turn = t} depth =
-  let (_, result) = searchAlphaBetaNaive' g depth (- scoreWin - 1) (scoreWin + 1) (even t) []
+  let (_, result) = searchAlphaBetaNaive' g depth (- scoreWin) scoreWin (even t) []
    in if null result then head (getLegalMoves' False g) else last result
 
 searchAlphaBetaNaive' :: GameState -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove])
@@ -87,7 +87,7 @@ searchAlphaBetaNaive' g@GameState {GS.legalMoves = mv} depth alpha beta shouldMa
     (Just sc, Nothing) -> (sc, sofar) -- terminal node
     (Just sc, Just m) -> (sc, m : sofar) -- terminal node
     (Nothing, _) ->
-      let nextStates = fmap (makeMove g) mv
+      let nextStates = fmap (makeMove g) (take (depth * 20) mv) -- branch cut
           bestScore = if shouldMaximize then - scoreWin - 1 else scoreWin + 1
        in searchAlphaBetaNaive'' (zip mv nextStates) depth alpha beta shouldMaximize sofar (bestScore, [])
 

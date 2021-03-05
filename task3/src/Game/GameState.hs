@@ -35,9 +35,10 @@ import Data.Board (Board (Board), Level, Player (Player))
 import qualified Data.Board
 import qualified Data.BoardWithoutCard
 import Data.Card (Card (Apollo, Artemis, Atlas, Demeter, Hephastus, Minotaur, Pan, Prometheus))
-import Data.List (find, sort, tails)
-import Data.Map (Map, (!))
-import qualified Data.Map
+
+import Data.IntMap (IntMap, (!))
+import qualified Data.IntMap as Map
+import Data.List (find, foldl', sort, tails)
 import Game.BitBoard
 import Game.GameMove
 
@@ -47,13 +48,13 @@ type Cards = [Maybe Card]
 
 type Players = [[Index]]
 
-type PlayerMap = Map Int BitBoard
+type PlayerMap = IntMap BitBoard
 
 type Turn = Int
 
-type Levels = Map Index Level
+type Levels = IntMap Level
 
-type LevelMap = Map Int BitBoard
+type LevelMap = IntMap BitBoard
 
 -- Internal representation of game states.
 data GameState = GameState
@@ -93,7 +94,7 @@ fromBoard' c1 c2 (w1, w2) (w3, w4) sp t =
   let cs = [c1, c2]
       pl = [[posToIndex w1, posToIndex w2], [posToIndex w3, posToIndex w4]]
       pm = createPlayerMap pl
-      lv = Data.Map.fromList [(posToIndex (r, c), sp !! (r -1) !! (c -1)) | r <- [1 .. 5], c <- [1 .. 5]]
+      lv = Map.fromList [(posToIndex (r, c), sp !! (r -1) !! (c -1)) | r <- [1 .. 5], c <- [1 .. 5]]
       lm = createLevelMap lv
       mv = getLegalMoves True cs pl pm lv lm
    in GameState {cards = cs, players = pl, playerMap = pm, levels = lv, turn = t, levelMap = lm, legalMoves = mv}
@@ -138,21 +139,16 @@ createPlayerMap pl =
       v4 = (m !! 0) .|. (m !! 1)
       v5 = (m !! 2) .|. (m !! 3)
       v6 = v4 .|. v5
-   in Data.Map.fromList $ zip [0 ..] (m ++ [v4, v5, v6])
+   in Map.fromList $ zip [0 ..] (m ++ [v4, v5, v6])
 
 createLevelMap :: Levels -> LevelMap
 createLevelMap lv =
-  let m' = Data.Map.fromListWith (.|.) [(v, singletonBB k) | (k, v) <- Data.Map.toList lv]
-      m = Data.Map.union m' (Data.Map.fromList [(l, 0) | l <- [0 .. 4]])
+  let m' = Map.fromListWith (.|.) [(v, singletonBB k) | (k, v) <- Map.toList lv]
+      m = Map.union m' (Map.fromList [(l, 0) | l <- [0 .. 4]])
       v5 = (m ! 0) .|. (m ! 1) -- level 0 or 1
       v6 = v5 .|. (m ! 2) -- level 0, 1 or 2
       v7 = v6 .|. (m ! 3) -- level 0, 1, 2 or 3
-   in Data.Map.union m $ Data.Map.fromList [(5, v5), (6, v6), (7, v7)]
-
--- createMoveAdjacencyList :: Levels -> LevelMap -> AdjList
--- createMoveAdjacencyList lv lm =
---   let f i = getNeighborhood i .&. sum [lm ! h | h <- [0 .. (min 3 ((lv ! i) + 1))]]
---    in Data.Map.fromList [(i, if lv ! i == 4 then 0 else f i) | i <- validIndices]
+   in Map.insert 5 v5 $ Map.insert 6 v6 $ Map.insert 7 v7 m
 
 --------------------------------------------------------------------------------
 -- Move to
@@ -169,7 +165,7 @@ getLegalMoveTo :: Maybe Card -> Index -> PlayerMap -> Levels -> LevelMap -> [Ind
 getLegalMoveTo (Just Artemis) mf pm lv lm =
   let firstMove = getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
       secondMoveFrom = (if mf `elemBB` (lm ! 2) then (\x -> x `andNotBB` (lm ! 3)) else id) firstMove
-   in bbToList $ foldl (\z x -> z .|. getLegalMoveTo' x lv lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
+   in bbToList $ foldl' (\z x -> z .|. getLegalMoveTo' x lv lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
 --
 -- [Minotaur]
 -- A token’s move can optionally enter the space of an opponent’s token,
@@ -283,8 +279,8 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
         -- update player map
         let moveDiff = listToBB [mf, mt]
         let pushDiff = maybe 0 (\(_, pt) -> listToBB [mt, pt]) pushInfo
-        let pm' = foldl (flip (Data.Map.adjust (xor moveDiff))) pm [wk, 4, 6]
-        let pm'' = maybe id (\(wid, _) mm -> foldl (flip (Data.Map.adjust (xor pushDiff))) mm [2 + wid, 5, 6]) pushInfo pm'
+        let pm' = foldl' (flip (Map.adjust (xor moveDiff))) pm [wk, 4, 6]
+        let pm'' = maybe id (\(wid, _) mm -> foldl' (flip (Map.adjust (xor pushDiff))) mm [2 + wid, 5, 6]) pushInfo pm'
 
         -- check point 1
         let moveSofar = (applyPushTo . applyDoubleMove . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
@@ -383,17 +379,23 @@ makeNextPlayers [p1, p2] mv =
 makeNextPlayers _ _ = undefined
 
 makeNextLevels :: Levels -> [(Index, Level, Level)] -> Levels
-makeNextLevels = foldl (\xlv (bl, _, nextLevel) -> Data.Map.insert bl nextLevel xlv)
+makeNextLevels = foldl' (\xlv (bl, _, nextLevel) -> Map.insert bl nextLevel xlv)
 
--- most time-consuming?
+-- Note: Use strict foldl' for better performance.
 makeNextLevelMap :: LevelMap -> [(Index, Level, Level)] -> LevelMap
-makeNextLevelMap =
-  foldl
-    ( \xlm (bl, prevLevel, nextLevel) ->
-        let f = Data.Map.adjust (xor (singletonBB bl))
-            rng = [(max 5 (prevLevel + 4)) .. (nextLevel + 3)] -- cumulative info
-         in foldl (flip f) xlm $ [prevLevel, nextLevel] ++ rng
-    )
+makeNextLevelMap lm bls =
+  let m =
+        foldl'
+          ( \xlm (bl, prevLevel, nextLevel) ->
+              let x = singletonBB bl
+               in Map.adjust (xor x) prevLevel $ Map.adjust (xor x) nextLevel xlm
+          )
+          lm
+          bls
+      v5 = (m ! 0) .|. (m ! 1) -- level 0 or 1
+      v6 = v5 .|. (m ! 2) -- level 0, 1 or 2
+      v7 = v6 .|. (m ! 3) -- level 0, 1, 2 or 3
+   in Map.insert 5 v5 $ Map.insert 6 v6 $ Map.insert 7 v7 m
 
 makeMove :: GameState -> GameMove -> GameState
 makeMove

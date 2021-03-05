@@ -13,8 +13,8 @@ where
 
 import Data.Bits (complement, (.&.), (.|.))
 import Data.Card ( Card(Pan, Apollo, Minotaur, Artemis) )
-import Data.Map (Map, (!))
-import qualified Data.Map
+import Data.IntMap (IntMap, (!))
+import qualified Data.IntMap as Map
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Vector.Unboxed as V
@@ -114,12 +114,12 @@ distInf :: Int
 distInf = 100 -- infinity distance
 
 -- breadth-first search
-bfs :: AdjList -> BitBoard -> Index -> Map Index Int
+bfs :: AdjList -> BitBoard -> Index -> IntMap Int
 bfs adj avail start =
-  let initMap = Data.Map.fromList [(i, if i == start then 0 else distInf) | i <- validIndices]
+  let initMap = Map.fromList [(i, if i == start then 0 else distInf) | i <- validIndices]
    in bfs' adj avail (Seq.singleton start) initMap
 
-bfs' :: AdjList -> BitBoard -> Seq Index -> Map Index Int -> Map Index Int
+bfs' :: AdjList -> BitBoard -> Seq Index -> IntMap Int -> IntMap Int
 bfs' _ _ q sofar | Seq.null q = sofar
 bfs' adj avail q sofar =
   let x = q `Seq.index` 0
@@ -127,17 +127,17 @@ bfs' adj avail q sofar =
       unseen = Seq.fromList [nbr | nbr <- nbrs, (sofar ! nbr) == distInf]
       d = (sofar ! x) + 1
       q' = Seq.drop 1 q Seq.>< unseen
-      sofar' = foldl (\m u -> Data.Map.insert u d m) sofar unseen
+      sofar' = foldl (\m u -> Map.insert u d m) sofar unseen
    in bfs' adj avail q' sofar'
 
-getDistances :: Cards -> Players -> AdjList -> ([[Map Index Int]], [Map Index Int])
+getDistances :: Cards -> Players -> AdjList -> ([[IntMap Int]], [IntMap Int])
 getDistances cs pl adj =
   let ps = [listToBB ws | ws <- pl] -- player bitboards
       f p = any (\x -> x `elem` (cs !! p)) [Apollo, Minotaur] -- those gods ignore opponent's positions
       obstacles = [if f p then 0 else ps !! (1 - p) | p <- [0, 1]]
       dist' = [[bfs adj (complement (obstacles !! p)) (pl !! p !! w) | w <- [0, 1]] | p <- [0, 1]]
-      dist = [if Artemis `elem` (cs !! p) then [Data.Map.map (\x -> (x + 1) `div` 2) (dist' !! p !! w) | w <- [0, 1]] else dist' !! p | p <- [0, 1]]
-      bestDist = [Data.Map.fromList [(i, minimum [dist !! p !! w ! i | w <- [0, 1]]) | i <- validIndices] | p <- [0, 1]]
+      dist = [if Artemis `elem` (cs !! p) then [Map.map (\x -> (x + 1) `div` 2) (dist' !! p !! w) | w <- [0, 1]] else dist' !! p | p <- [0, 1]]
+      bestDist = [Map.fromList [(i, minimum [dist !! p !! w ! i | w <- [0, 1]]) | i <- validIndices] | p <- [0, 1]]
    in (dist, bestDist)
 
 --------------------------------------------------------------------------------
@@ -185,15 +185,15 @@ evaluate'
       sign = if even t then 1 else -1
 
 -- (1) Worker Proximity
-evaluateWorkerProximity :: Players -> [[Map Index Int]] -> Int -> Score
+evaluateWorkerProximity :: Players -> [[IntMap Int]] -> Int -> Score
 evaluateWorkerProximity pl dist p = sum [getProxTableValue (dist !! p !! w ! (pl !! p !! (1 - w))) | w <- [0, 1]]
 
 -- (2) Reachability
-evaluateReachability :: Levels -> [Map Index Int] -> Int -> Score
+evaluateReachability :: Levels -> [IntMap Int] -> Int -> Score
 evaluateReachability lv dist p = sum [getReachTableValue p (lv ! i) (dist !! p ! i) | i <- validIndices]
 
 -- (3) Asymmetry
-evaluateAsymmetry :: Players -> Levels -> LevelMap -> [Map Index Int] -> Int -> Score
+evaluateAsymmetry :: Players -> Levels -> LevelMap -> [IntMap Int] -> Int -> Score
 evaluateAsymmetry pl lv lm dist p = sum . map g $ validIndices
   where
     ws = sum . map singletonBB . concat $ pl -- all workers
@@ -207,7 +207,7 @@ evaluateStuckBonus :: Players -> AdjList -> Int -> Score
 evaluateStuckBonus pl adj p = sum [if adj V.! (pl !! (1 - p) !! w) == 0 then evalStuckBonus else 0 | w <- [0, 1]]
 
 -- (5) Prevension: worker at height 2, opponent cannot approach
-evaluatePrevention :: Players -> Levels -> LevelMap -> [Map Index Int] -> Int -> Score
+evaluatePrevention :: Players -> Levels -> LevelMap -> [IntMap Int] -> Int -> Score
 evaluatePrevention pl lv lm dist p = sum [f index | w <- [0, 1], let index = pl !! p !! w, lv ! index == 2]
   where
     f index =

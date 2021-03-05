@@ -9,7 +9,7 @@ import Data.Maybe (fromMaybe)
 import Game.BitBoard
 import Game.Evaluation
 import Game.GameMove
-import Game.GameState (GameState (GameState, legalMoves), fromBoard, makeMove)
+import Game.GameState (GameState (legalMoves), fromBoard, makeMove)
 import Search.Search
 import Test.Hspec
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
@@ -29,16 +29,16 @@ spec = do
             states = scanl (\s (Just m) -> makeMove s m) s0 moves
          in do
               score >= (- scoreWin) `shouldBe` True
-              score <= (scoreWin) `shouldBe` True
+              score <= scoreWin `shouldBe` True
 
-              tail states `shouldBe` (map fst hs)
+              tail states `shouldBe` map fst hs
 
   describe "Search#findMove()" $ do
     it "does not crash" $ do
       let s61 = "{\"players\":[{\"card\":\"Artemis\",\"tokens\":[[2,2],[3,4]]},{\"card\":\"Apollo\",\"tokens\":[[1,3],[4,2]]}],\"spaces\":[[2,4,1,4,4],[4,2,4,2,2],[2,4,2,2,2],[2,2,4,4,4],[4,4,4,1,0]],\"turn\":70}"
       let b61 = fromBoard $ fromMaybe undefined (readBoard s61)
 
-      findMove 3 0 b61 > 0 `shouldBe` True
+      findMove 4 0 b61 > 0 `shouldBe` True
 
     it "finds a defensive move" $ do
       let b1 =
@@ -63,7 +63,7 @@ spec = do
       let hs = reverse history
       let moves = map snd hs
       let states = scanl (\s (Just m) -> makeMove s m) s1 moves
-      tail states `shouldBe` (map fst hs)
+      tail states `shouldBe` map fst hs
 
       -- print $ map (maybe undefined showMove . snd) history
 
@@ -104,13 +104,34 @@ spec = do
 
       -- ==== DEBUG END ====
 
-      let mv = findMove 3 0 s1
+      let mv = findMove 4 0 s1
 
       getMoveFrom mv `shouldBe` posToIndex (1, 5)
       getMoveTo mv `shouldBe` posToIndex (2, 4)
       let builds = getBuildAt mv
       builds `shouldContain` [(posToIndex (3, 4), 3, 4)]
       builds `shouldNotContain` [(posToIndex (1, 5), 2, 3)] -- losing build
+    it "should make a losing move if all moves are losing" $ do
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Demeter, B.tokens = Just ((2, 3), (2, 4))},
+                    B.Player {B.card = Prometheus, B.tokens = Just ((3, 1), (3, 2))}
+                  ),
+                B.spaces =
+                  [ [0, 0, 0, 1, 0],
+                    [0, 0, 0, 2, 0],
+                    [0, 2, 1, 0, 1],
+                    [3, 0, 1, 0, 0],
+                    [0, 0, 0, 0, 0]
+                  ],
+                B.turn = 7
+              }
+      let s1 = fromBoard b1
+      printAllMoves s1
+      let mv = findMove 4 0 s1
+      getLose mv `shouldBe` True
+
   describe "Search#searchAlphaBeta()" $ do
     it "finds the best move" $ do
       let nodes =
