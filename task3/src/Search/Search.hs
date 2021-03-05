@@ -20,7 +20,7 @@ findMove 2 _ g@GameState {GS.legalMoves = _ : _} =
 -- Alpha-beta (generic): Do not use. Why is this so slow?
 findMove 3 _ g = getNextMove g $ findMoveAlphaBeta g 3
 -- Alpha-beta
-findMove 4 _ g@GameState {GS.turn = t} = searchAlphaBetaNaive g (even t) 3
+findMove 4 _ g = searchAlphaBetaNaive g 3
 --
 findMove _ _ _ = undefined
 
@@ -37,7 +37,7 @@ createBranches :: SearchNode -> [SearchNode]
 createBranches (s@GameState {GS.legalMoves = mv}, _) =
   case evaluate' s of
     (Just _, _) -> [] -- has a conclusion
-    (_, _) -> [(GS.makeMove s m, Just m) | m <- mv, not (getWin m)]
+    (_, _) -> [(GS.makeMove s m, Just m) | m <- mv]
 
 scoreNode :: SearchNode -> Score
 scoreNode = evaluate . fst
@@ -72,15 +72,15 @@ searchMiniMax' g@GameState {GS.legalMoves = mv} depth shouldMaximize sofar =
 -- Alpha-beta Search
 --------------------------------------------------------------------------------
 
-searchAlphaBetaNaive :: GameState -> Bool -> Int -> GameMove
-searchAlphaBetaNaive g maximize depth =
-  let (_, result) = searchAlphaBetaNaive' g depth (- scoreWin - 1) (scoreWin + 1) maximize []
+searchAlphaBetaNaive :: GameState -> Int -> GameMove
+searchAlphaBetaNaive g@GameState {GS.turn = t} depth =
+  let (_, result) = searchAlphaBetaNaive' g depth (- scoreWin - 1) (scoreWin + 1) (even t) []
    in if null result then head (getLegalMoves' False g) else last result
 
 searchAlphaBetaNaive' :: GameState -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove])
 -- reached depth limit
 searchAlphaBetaNaive' g depth _ _ _ sofar
-  | depth == 0 = (evaluate g, sofar)
+  | depth <= 0 = (evaluate g, sofar)
 --
 searchAlphaBetaNaive' g@GameState {GS.legalMoves = mv} depth alpha beta shouldMaximize sofar =
   case evaluate' g of

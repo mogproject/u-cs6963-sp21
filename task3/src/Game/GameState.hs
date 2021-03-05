@@ -8,20 +8,24 @@ module Game.GameState
     makeMove,
     cards,
     players,
+    playerMap,
     levels,
     turn,
     levelMap,
-    moveAdjacency,
     legalMoves,
     Index,
     Cards,
     Players,
     Levels,
     LevelMap,
-    AdjList,
     getLegalMoves',
     getLegalMoveTo,
+    getLegalMoveTo',
     getLegalBuildAt,
+    createPlayerMap,
+    createLevelMap,
+    isWinningMove,
+    hasWinningMove,
   )
 where
 
@@ -43,22 +47,39 @@ type Cards = [Maybe Card]
 
 type Players = [[Index]]
 
+type PlayerMap = Map Int BitBoard
+
 type Turn = Int
 
 type Levels = Map Index Level
 
-type LevelMap = Map Level BitBoard
-
-type AdjList = Map Index BitBoard -- adjacency list from each index
+type LevelMap = Map Int BitBoard
 
 -- Internal representation of game states.
 data GameState = GameState
   { cards :: Cards, -- Cards (player to move, player to wait)
     players :: Players, -- Players (player to move, player to wait)
-    levels :: Levels, -- Levels
+    -- Player Map: bitboards for each player and its combinations
+    --   0 -> Player 1 Worker 1
+    --   1 -> Player 1 Worker 2
+    --   2 -> Player 2 Worker 1
+    --   3 -> Player 2 Worker 2
+    --   4 -> Player 1 both workers
+    --   5 -> Player 2 both workers
+    --   6 -> All workers
+    playerMap :: PlayerMap,
+    levels :: Levels, -- Levels: Index -> Level
+    -- Level Map: bitboards for each level and its combinations
+    --   0 -> Level 0
+    --   1 -> Level 1
+    --   2 -> Level 2
+    --   3 -> Level 3
+    --   4 -> Level 4
+    --   5 -> Level 0 or 1
+    --   6 -> Level 0, 1 or 2
+    --   7 -> Level 0, 1, 2 or 3
+    levelMap :: LevelMap,
     turn :: Turn,
-    levelMap :: LevelMap, -- level [0..4] -> bitmap
-    moveAdjacency :: AdjList, -- move adjacency list: index -> bitboard
     legalMoves :: [GameMove] -- Legal moves
   }
   deriving (Ord, Eq, Show)
@@ -71,11 +92,11 @@ fromBoard' :: Maybe Card -> Maybe Card -> Data.Board.Workers -> Data.Board.Worke
 fromBoard' c1 c2 (w1, w2) (w3, w4) sp t =
   let cs = [c1, c2]
       pl = [[posToIndex w1, posToIndex w2], [posToIndex w3, posToIndex w4]]
+      pm = createPlayerMap pl
       lv = Data.Map.fromList [(posToIndex (r, c), sp !! (r -1) !! (c -1)) | r <- [1 .. 5], c <- [1 .. 5]]
       lm = createLevelMap lv
-      adj = createMoveAdjacencyList lv lm
-      mv = getLegalMoves True cs pl lv lm adj
-   in GameState {cards = cs, players = pl, levels = lv, turn = t, levelMap = lm, moveAdjacency = adj, legalMoves = mv}
+      mv = getLegalMoves True cs pl pm lv lm
+   in GameState {cards = cs, players = pl, playerMap = pm, levels = lv, turn = t, levelMap = lm, legalMoves = mv}
 
 fromBoard :: Board -> GameState
 fromBoard
@@ -111,52 +132,64 @@ toBoardWithoutCard GameState {players = [[w1, w2], [w3, w4]], levels = lv, turn 
    in Data.BoardWithoutCard.Board {Data.BoardWithoutCard.players = pl, Data.BoardWithoutCard.spaces = sp, Data.BoardWithoutCard.turn = t}
 toBoardWithoutCard _ = undefined
 
---------------------------------------------------------------------------------
--- Moves
---------------------------------------------------------------------------------
+createPlayerMap :: Players -> PlayerMap
+createPlayerMap pl =
+  let m = [singletonBB (pl !! p !! w) | p <- [0, 1], w <- [0, 1]]
+      v4 = (m !! 0) .|. (m !! 1)
+      v5 = (m !! 2) .|. (m !! 3)
+      v6 = v4 .|. v5
+   in Data.Map.fromList $ zip [0 ..] (m ++ [v4, v5, v6])
 
 createLevelMap :: Levels -> LevelMap
 createLevelMap lv =
-  let m = Data.Map.fromListWith (.|.) [(v, singletonBB k) | (k, v) <- Data.Map.toList lv]
-   in Data.Map.union m (Data.Map.fromList [(l, 0) | l <- [0 .. 4]])
+  let m' = Data.Map.fromListWith (.|.) [(v, singletonBB k) | (k, v) <- Data.Map.toList lv]
+      m = Data.Map.union m' (Data.Map.fromList [(l, 0) | l <- [0 .. 4]])
+      v5 = (m ! 0) .|. (m ! 1) -- level 0 or 1
+      v6 = v5 .|. (m ! 2) -- level 0, 1 or 2
+      v7 = v6 .|. (m ! 3) -- level 0, 1, 2 or 3
+   in Data.Map.union m $ Data.Map.fromList [(5, v5), (6, v6), (7, v7)]
 
-createMoveAdjacencyList :: Levels -> LevelMap -> AdjList
-createMoveAdjacencyList lv lm =
-  let f i = getNeighborhood i .&. sum [lm ! h | h <- [0 .. (min 3 ((lv ! i) + 1))]]
-   in Data.Map.fromList [(i, if lv ! i == 4 then 0 else f i) | i <- validIndices]
+-- createMoveAdjacencyList :: Levels -> LevelMap -> AdjList
+-- createMoveAdjacencyList lv lm =
+--   let f i = getNeighborhood i .&. sum [lm ! h | h <- [0 .. (min 3 ((lv ! i) + 1))]]
+--    in Data.Map.fromList [(i, if lv ! i == 4 then 0 else f i) | i <- validIndices]
 
 --------------------------------------------------------------------------------
 -- Move to
 --------------------------------------------------------------------------------
-getLegalMoveTo :: Maybe Card -> Index -> LevelMap -> BitBoard -> BitBoard -> BitBoard -> AdjList -> [Index]
+getLegalMoveTo' :: Index -> Levels -> LevelMap -> BitBoard
+getLegalMoveTo' mf lv lm = getNeighborhood mf .&. (lm ! min 7 ((lv ! mf) + 5))
+
+getLegalMoveTo :: Maybe Card -> Index -> PlayerMap -> Levels -> LevelMap -> [Index]
 --
 -- [Artemis]
 -- The moved token can optionally move a second time (i.e., the same token),
 -- as long as the first move doesn’t win, and as long as the second move doesn’t return
 -- to the original space.
-getLegalMoveTo (Just Artemis) mf lm _ allWorkers _ adj =
-  let firstMove = (adj ! mf) `andNotBB` allWorkers
+getLegalMoveTo (Just Artemis) mf pm lv lm =
+  let firstMove = getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
       secondMoveFrom = (if mf `elemBB` (lm ! 2) then (\x -> x `andNotBB` (lm ! 3)) else id) firstMove
-   in bbToList $ foldl (\z x -> z .|. adj ! x) firstMove (bbToList secondMoveFrom) `andNotBB` allWorkers
+   in bbToList $ foldl (\z x -> z .|. getLegalMoveTo' x lv lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
 --
 -- [Minotaur]
 -- A token’s move can optionally enter the space of an opponent’s token,
 -- but only if the token can be pushed back to an unoccupied space, and only as long as
 -- the token would be able to move to the opponent’s space if the opponent token were not there.
 -- The unoccupied space where the opponent’s token is pushed can be at any level less than 4.
-getLegalMoveTo (Just Minotaur) mf _ friend _ emptySpace adj =
-  let candidates = (adj ! mf) `andNotBB` friend
-      isValidMoveTo mt = getPointSymmetricIndex mt mf `elemBB` emptySpace -- works only if mf and mt are adjacent
-   in filter (\x -> x `elemBB` emptySpace || isValidMoveTo x) (bbToList candidates)
+getLegalMoveTo (Just Minotaur) mf pm lv lm =
+  let candidates = getLegalMoveTo' mf lv lm `andNotBB` (pm ! 4)
+      emptySpace = (lm ! 7) `andNotBB` (pm ! 6)
+      isValidMoveTo mt = mt `elemBB` emptySpace || getPointSymmetricIndex mt mf `elemBB` emptySpace -- works only if mf and mt are adjacent
+   in filter isValidMoveTo (bbToList candidates)
 --
 -- [Apollo]
 -- A token’s move can optionally swap places with an adjacent opponent token,
 -- as long as the token would be able to move to the opponent’s space if the
 -- opponent token were not there; otherwise, the move must be to an unoccupied space as usual.
-getLegalMoveTo (Just Apollo) mf _ friend _ _ adj = bbToList $ (adj ! mf) `andNotBB` friend
+getLegalMoveTo (Just Apollo) mf pm lv lm = bbToList $ getLegalMoveTo' mf lv lm `andNotBB` (pm ! 4)
 --
 -- Others.
-getLegalMoveTo _ mf _ _ allWorkers _ adj = bbToList $ (adj ! mf) `andNotBB` allWorkers
+getLegalMoveTo _ mf pm lv lm = bbToList $ getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
 
 --------------------------------------------------------------------------------
 -- Push to
@@ -228,35 +261,33 @@ getLegalMoves'
   GameState
     { cards = cs,
       players = ps,
+      playerMap = pm,
       levels = lv,
-      levelMap = lm,
-      moveAdjacency = adj
-    } = getLegalMoves effectiveOnly cs ps lv lm adj
+      levelMap = lm
+    } = getLegalMoves effectiveOnly cs ps pm lv lm
 
-getLegalMoves :: Bool -> Cards -> Players -> Levels -> LevelMap -> AdjList -> [GameMove]
-getLegalMoves effectiveOnly [c1, c2] pl lv lm adj =
+getLegalMoves :: Bool -> Cards -> Players -> PlayerMap -> Levels -> LevelMap -> [GameMove]
+getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
   let allMoves = do
         wk <- [0, 1]
         let mf = pl !! 0 !! wk -- move from
 
-        -- bitboards
-        let opponentWorkers = (sum . map singletonBB) (pl !! 1)
-        let friendWorker = singletonBB (pl !! 0 !! (1 - wk))
-        let otherWorkers = opponentWorkers .|. friendWorker
-        let allWorkers = otherWorkers .|. singletonBB (pl !! 0 !! wk)
-        let emptySpace = globalMask `andNotBB` ((lm ! 4) .|. otherWorkers)
-
         -- move to
-        mt <- getLegalMoveTo c1 mf lm friendWorker allWorkers emptySpace adj
-        let applyDoubleMove = if mt `elemBB` (adj ! mf) then id else setDoubleMove
+        mt <- getLegalMoveTo c1 mf pm lv lm
+        let applyDoubleMove = if mt `elemBB` getLegalMoveTo' mf lv lm then id else setDoubleMove
 
         -- push to
         let pushInfo = getLegalPushTo c1 pl mf mt
         let applyPushTo = maybe id (uncurry setOpponentMove) pushInfo
 
+        -- update player map
+        let moveDiff = listToBB [mf, mt]
+        let pushDiff = maybe 0 (\(_, pt) -> listToBB [mt, pt]) pushInfo
+        let pm' = foldl (flip (Data.Map.adjust (xor moveDiff))) pm [wk, 4, 6]
+        let pm'' = maybe id (\(wid, _) mm -> foldl (flip (Data.Map.adjust (xor pushDiff))) mm [2 + wid, 5, 6]) pushInfo pm'
+
         -- check point 1
         let moveSofar = (applyPushTo . applyDoubleMove . setMoveToLevel (lv ! mt) . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
-        let emptySofar = emptySpace .&. complement (maybe 0 (\(_, pushTo) -> 1 `shift` pushTo) pushInfo)
 
         -- check winning
         -- Note: it's possible for Artemis to win by moving like 1->2->3 or 3->2->3
@@ -265,26 +296,18 @@ getLegalMoves effectiveOnly [c1, c2] pl lv lm adj =
             return $ setWin moveSofar
           else do
             -- build at
-            bls <- getLegalBuildAt c1 lv emptySofar mf mt
+            let emptySpace = ((lm ! 7) `andNotBB` (pm'' ! 6)) .|. singletonBB mt
+            bls <- getLegalBuildAt c1 lv emptySpace mf mt
 
             -- check point 2
             let moveSofar' = setBuildAt bls moveSofar
 
             -- check next levels
-            let (lv', lm') =
-                  foldl
-                    ( \(xlv, xlm) (bl, nextLevel) ->
-                        let prevLevel = xlv ! bl
-                            f = Data.Map.adjust (xor (singletonBB bl)) -- toggle bl bit
-                            xlv' = Data.Map.insert bl nextLevel xlv
-                            xlm' = f nextLevel $ f prevLevel xlm
-                         in (xlv', xlm')
-                    )
-                    (lv, lm)
-                    bls
+            -- let lv' = makeNextLevels lv bls
+            let lm' = makeNextLevelMap lv lm bls
 
             -- evaluation
-            if isLosingMove c2 (pl !! 1) lv' lm'
+            if hasWinningMove c2 1 pm'' lm'
               then do
                 let moveSofar'' = setLose moveSofar'
                 guard $ not effectiveOnly
@@ -298,75 +321,83 @@ getLegalMoves effectiveOnly [c1, c2] pl lv lm adj =
         else sort allMoves
 getLegalMoves _ _ _ _ _ _ = undefined
 
+--------------------------------------------------------------------------------
+-- Checking Winning Moves
+--------------------------------------------------------------------------------
+
 isWinningMove :: Maybe Card -> Index -> Index -> Levels -> LevelMap -> Bool
 -- Artemis' move lv 3 -> lv 2 -> lv 3
 isWinningMove (Just Artemis) mf mt lv lm | (lv ! mt) == 3 && (lv ! mf) == 3 = getNeighborhood mf .&. getNeighborhood mt .&. (lm ! 2) /= 0
 isWinningMove (Just Pan) mf mt lv lm = (lv ! mt) + 2 <= (lv ! mf) || isWinningMove Nothing mf mt lv lm
 isWinningMove _ mf mt lv _ = (lv ! mt) == 3 && (lv ! mf) < 3
 
-isLosingMove :: Maybe Card -> [Index] -> Levels -> LevelMap -> Bool
-isLosingMove _ pl _ lm = getClosedNeighborhood (listToBB pl .&. lm ! 2) .&. lm ! 3 /= 0
+hasWinningMove :: Maybe Card -> Int -> PlayerMap -> LevelMap -> Bool
+-- Pan: ((N[P4 & L2] & (L0 & L3)) | (N[P4 & L3] & L5)) & ~P6
+hasWinningMove (Just Pan) p pm lm =
+  let fromLv2 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 2)) .&. ((lm ! 0) .|. (lm ! 3))
+      fromLv3 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 3)) .&. (lm ! 5)
+   in (fromLv2 .|. fromLv3) `andNotBB` (pm ! 6) /= 0
+-- Artemis: N[L3 & ~P6] & L2 & (P4 | (N[P4 & ~L0] & ~P6))
+hasWinningMove (Just Artemis) p pm lm =
+  let x = (pm ! (4 + p)) `andNotBB` (lm ! 0) -- Artemis workers at Lv 1, 2, or 3
+      a = getClosedNeighborhood ((lm ! 3) `andNotBB` (pm ! 6)) .&. (lm ! 2) -- Lv2 spaces next to empty Lv3
+      b = getClosedNeighborhood x .&. (pm ! 6) -- Artemis workers' empty neighbors
+   in a .&. (x .|. b) /= 0
+-- Minotaur
+hasWinningMove (Just Minotaur) p pm lm =
+  let x = (pm ! (4 + p)) .&. (lm ! 2)
+      y = getClosedNeighborhood x .&. (lm ! 3) .&. (pm ! (5 - p))
+      q = getPushBB x y
+   in hasWinningMove Nothing p pm lm || q .&. (lm ! 7) `andNotBB` (pm ! 6) /= 0
+-- Others: N[P4 & L2] & L3 & ~P6
+hasWinningMove _ p pm lm =
+  getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 2)) .&. (lm ! 3) `andNotBB` (pm ! 6) /= 0
+
+--------------------------------------------------------------------------------
+-- Making Moves
+--------------------------------------------------------------------------------
+
+makeNextPlayers :: Players -> GameMove -> Players
+makeNextPlayers [p1, p2] mv =
+  let (wk, mt) = (getWorkerId mv, getMoveTo mv)
+      (owk, omt) = getOpponentMove mv
+      p1' = [if wk == i then mt else p1 !! i | i <- [0, 1]]
+      p2' = [if owk == i then omt else p2 !! i | i <- [0, 1]]
+   in [p2', p1']
+makeNextPlayers _ _ = undefined
+
+makeNextLevels :: Levels -> [(Index, Level)] -> Levels
+makeNextLevels = foldl (\xlv (bl, nextLevel) -> Data.Map.insert bl nextLevel xlv)
+
+-- most time-consuming?
+makeNextLevelMap :: Levels -> LevelMap -> [(Index, Level)] -> LevelMap
+makeNextLevelMap lv =
+  foldl
+    ( \xlm (bl, nextLevel) ->
+        let prevLevel = lv ! bl
+            f = Data.Map.adjust (xor (singletonBB bl))
+            rng = [(max 5 (prevLevel + 4)) .. (nextLevel + 3)] -- cumulative info
+         in foldl (flip f) xlm $ [prevLevel, nextLevel] ++ rng
+    )
 
 makeMove :: GameState -> GameMove -> GameState
 makeMove
   GameState
     { cards = [c1, c2],
-      players = [p1, p2],
+      players = pl,
       levels = lv,
       turn = t,
-      levelMap = lm,
-      moveAdjacency = adj
+      levelMap = lm
     }
   mv =
     -- assume: m `elem` mv
-    let wk = getWorkerId mv
-        mt = getMoveTo mv
-        (owid, omt) = getOpponentMove mv
-        builds = getBuildAt mv
-
-        -- turn
-        t' = t + 1
-
-        -- cards
+    let t' = t + 1
         cs' = [c2, c1]
-
-        -- players
-        p1' = [if wk == i then mt else p1 !! i | i <- [0, 1]]
-        p2' = [if owid == i then omt else p2 !! i | i <- [0, 1]]
-        pl' = [p2', p1']
-
-        (lv', lm', adj') =
-          foldl
-            ( \(xlv, xlm, xadj) (bl, nextLevel) ->
-                let prevLevel = xlv ! bl
-                    f = Data.Map.adjust (xor (singletonBB bl)) -- toggle bl bit
-                    f' = Data.Map.adjust (\x -> x `andNotBB` singletonBB bl) -- remove bl bit
-                    g lo hi = sum [xlm ! h | h <- [lo .. hi]] -- merge level range
-
-                    -- levels
-                    xlv' = Data.Map.insert bl nextLevel xlv
-                    -- level map
-                    xlm' = f nextLevel $ f prevLevel xlm
-
-                    -- update adjacency lists
-                    addArc m =
-                      if prevLevel <= 1 -- add arc: bl -> high N(bl)
-                        then Data.Map.adjust (.|. (getNeighborhood bl .&. g (prevLevel + 2) (min 3 (nextLevel + 1)))) bl m
-                        else m
-                    removeArc m =
-                      if nextLevel >= 2 -- remove arc: low N(bl) -> bl
-                        then foldl (flip f) m (bbToList (getNeighborhood bl .&. g (max 0 (prevLevel - 1)) (nextLevel - 2)))
-                        else m
-
-                    xadj'
-                      | prevLevel == nextLevel = xadj
-                      | nextLevel == 4 = foldl (flip f') (Data.Map.insert bl 0 xadj) (bbToList (getNeighborhood bl `andNotBB` (xlm ! 4))) -- capped
-                      | otherwise = (removeArc . addArc) xadj
-                 in (xlv', xlm', xadj')
-            )
-            (lv, lm, adj)
-            builds
-
-        mv' = getLegalMoves True cs' pl' lv' lm' adj'
-     in GameState {cards = cs', players = pl', levels = lv', turn = t', levelMap = lm', moveAdjacency = adj', legalMoves = mv'}
+        pl' = makeNextPlayers pl mv
+        pm' = createPlayerMap pl'
+        builds = getBuildAt mv
+        lv' = makeNextLevels lv builds
+        lm' = makeNextLevelMap lv lm builds
+        mv' = getLegalMoves True cs' pl' pm' lv' lm'
+     in GameState {cards = cs', players = pl', playerMap = pm', levels = lv', turn = t', levelMap = lm', legalMoves = mv'}
 makeMove _ _ = undefined

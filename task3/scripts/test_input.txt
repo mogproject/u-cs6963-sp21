@@ -1,0 +1,2 @@
+[{"card":"Demeter"},{"card":"Prometheus","tokens":[[4,4],[5,5]]}]
+{"players":[{"card":"Demeter","tokens":[[3,4],[4,3]]},{"card":"Prometheus","tokens":[[4,4],[5,4]]}],"spaces":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,2],[0,0,0,0,0]],"turn":1}

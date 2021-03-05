@@ -1,10 +1,11 @@
 module Game.GameStateSpec (spec) where
 
-import Data.Bits (Bits ((.|.)))
+import Data.Bits (Bits ((.&.), (.|.)))
 import Data.Board (readBoard)
 import qualified Data.Board as B
 import Data.Card
 import Data.Map ((!))
+import qualified Data.Map
 import Data.Maybe (fromMaybe)
 import Game.BitBoard
 import Game.GameState
@@ -17,23 +18,17 @@ import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 ri :: Int -> Int -> Int
 ri r c = posToIndex (r, c)
 
-getLegalMoveTo' :: B.Board -> [[Int]]
-getLegalMoveTo' b =
+getLegalMoveTo'' :: B.Board -> [[Int]]
+getLegalMoveTo'' b =
   let GameState
         { cards = cs,
           players = pl,
-          levelMap = lm,
-          moveAdjacency = adj
+          playerMap = pm,
+          levels = lv,
+          levelMap = lm
         } = fromBoard b
 
-      f wk =
-        let mf = pl !! 0 !! wk
-            opponentWorkers = sum . map singletonBB $ pl !! 1
-            friend = singletonBB $ pl !! 0 !! (1 - wk)
-            otherWorkers = opponentWorkers .|. friend
-            allWorkers = otherWorkers .|. singletonBB (pl !! 0 !! wk)
-            emptySpace = globalMask `andNotBB` ((lm ! 4) .|. otherWorkers)
-         in getLegalMoveTo (cs !! 0) mf lm friend allWorkers emptySpace adj
+      f wk = getLegalMoveTo (cs !! 0) (pl !! 0 !! wk) pm lv lm
    in [f wk | wk <- [0, 1]]
 
 -- b: board after a move
@@ -42,14 +37,11 @@ getLegalBuildAt' b wk moveFrom =
   let GameState
         { cards = cs,
           players = pl,
+          playerMap = pm,
           levels = lv,
           levelMap = lm
         } = fromBoard b
-
-      opponentWorkers = sum . map singletonBB $ pl !! 1
-      friendWorker = singletonBB $ pl !! 0 !! (1 - wk)
-      otherWorkers = opponentWorkers .|. friendWorker
-      emptySpace = globalMask `andNotBB` ((lm ! 4) .|. otherWorkers)
+      emptySpace = ((lm ! 7) `andNotBB` (pm ! 6)) .|. singletonBB (pl !! 0 !! wk)
    in getLegalBuildAt (cs !! 0) lv emptySpace moveFrom (pl !! 0 !! wk)
 
 spec :: Spec
@@ -97,7 +89,7 @@ spec = do
                   ],
                 B.turn = 0
               }
-      getLegalMoveTo' b1
+      getLegalMoveTo'' b1
         `shouldBe` [ [ri 1 2, ri 1 3, ri 2 1, ri 2 2, ri 2 4, ri 3 1],
                      [ri 2 4, ri 2 5, ri 3 5, ri 5 4, ri 5 5]
                    ]
@@ -118,7 +110,7 @@ spec = do
                   ],
                 B.turn = 0
               }
-      getLegalMoveTo' b1
+      getLegalMoveTo'' b1
         `shouldBe` [ [ri 5 2],
                      [ri 3 1, ri 3 3]
                    ]
@@ -137,7 +129,7 @@ spec = do
                   ],
                 B.turn = 0
               }
-      getLegalMoveTo' b2
+      getLegalMoveTo'' b2
         `shouldBe` [ [],
                      [ri 2 2, ri 3 3]
                    ]
@@ -158,7 +150,7 @@ spec = do
                   ],
                 B.turn = 0
               }
-      getLegalMoveTo' b1
+      getLegalMoveTo'' b1
         `shouldBe` [ [ri 5 2],
                      [ri 3 1, ri 3 3, ri 5 2]
                    ]
@@ -179,7 +171,7 @@ spec = do
                   ],
                 B.turn = 0
               }
-      getLegalMoveTo' b1
+      getLegalMoveTo'' b1
         `shouldBe` [ [],
                      [ri 3 1]
                    ]
@@ -510,6 +502,44 @@ spec = do
                      [(ri 3 3, 3)],
                      [(ri 3 5, 4)]
                    ]
+
+  describe "GameState#hasWinningMove()" $ do
+    it "works with Minotaur" $ do
+      let pm1 = createPlayerMap [[ri 1 3, ri 3 4], [ri 2 3, ri 4 5]]
+      let pm1' = createPlayerMap [[ri 2 3, ri 4 5], [ri 1 3, ri 3 4]]
+      let lv =
+            Data.Map.fromList $
+              (zip validIndices . concat)
+                [ [3, 0, 3, 1, 2],
+                  [2, 4, 2, 0, 1],
+                  [1, 0, 1, 3, 0],
+                  [4, 2, 4, 3, 1],
+                  [4, 0, 0, 4, 0]
+                ]
+      let lm = createLevelMap lv
+      hasWinningMove (Just Minotaur) 0 pm1' lm `shouldBe` False
+      hasWinningMove (Just Minotaur) 1 pm1 lm `shouldBe` False
+
+      let pm2 = createPlayerMap [[ri 1 3, ri 3 4], [ri 2 3, ri 5 5]]
+      let pm2' = createPlayerMap [[ri 2 3, ri 5 5], [ri 1 3, ri 3 4]]
+      hasWinningMove (Just Minotaur) 0 pm2' lm `shouldBe` True
+      hasWinningMove (Just Minotaur) 1 pm2 lm `shouldBe` True
+
+    it "works with Apollo" $ do
+      let pm1 = createPlayerMap [[ri 1 4, ri 3 3], [ri 2 3, ri 4 5]]
+      let pm1' = createPlayerMap [[ri 2 3, ri 4 5], [ri 1 4, ri 3 3]]
+      let lv =
+            Data.Map.fromList $
+              (zip validIndices . concat)
+                [ [3, 0, 3, 1, 2],
+                  [2, 4, 2, 0, 1],
+                  [1, 0, 1, 3, 0],
+                  [4, 2, 4, 3, 1],
+                  [4, 0, 0, 4, 0]
+                ]
+      let lm = createLevelMap lv
+      hasWinningMove (Just Apollo) 0 pm1' lm `shouldBe` True
+      hasWinningMove (Just Apollo) 1 pm1 lm `shouldBe` True
 
   describe "GameState#makeMove()" $ do
     it "has no side effects" $ do

@@ -16,6 +16,7 @@ module Game.BitBoard
     validIndices,
     isValidIndex,
     getPointSymmetricIndex,
+    getPushBB,
   )
 where
 
@@ -115,3 +116,17 @@ getClosedNeighborhood bb =
   let x = bb .|. (bb `shift` 1) .|. (bb `shift` (-1))
       y = x .|. (x `shift` 7) .|. (x `shift` (-7))
    in y .&. globalMask
+
+--------------------------------------------------------------------------------
+-- Pushing
+--------------------------------------------------------------------------------
+
+getPushBB :: BitBoard -> BitBoard -> BitBoard
+getPushBB pusher pushed =
+  listToBB
+    [ r
+      | p <- bbToList pusher,
+        q <- bbToList pushed,
+        let r = getPointSymmetricIndex q p,
+        isValidIndex r
+    ]
