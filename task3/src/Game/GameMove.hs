@@ -19,6 +19,8 @@ module Game.GameMove
     setBuildAt,
     getBuildAt,
     setDefence,
+    setBlocking,
+    setStepping,
   )
 where
 
@@ -151,3 +153,9 @@ setDoubleMove = setValue 33 1 0
 
 setDefence :: Int64 -> Int64
 setDefence = setValue 45 1 0
+
+setBlocking :: Int64 -> Int64
+setBlocking = setValue 56 1 0
+
+setStepping :: Int64 -> Int64
+setStepping = setValue 57 1 0

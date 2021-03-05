@@ -12,7 +12,7 @@ module Game.Evaluation
 where
 
 import Data.Bits (complement, (.&.), (.|.))
-import Data.Card (Card (Apollo, Artemis, Atlas, Demeter, Hephastus, Minotaur, Pan, Prometheus))
+import Data.Card ( Card(Pan, Apollo, Minotaur, Artemis) )
 import Data.Map (Map, (!))
 import qualified Data.Map
 import Data.Sequence (Seq)

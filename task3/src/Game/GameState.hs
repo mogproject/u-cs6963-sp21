@@ -313,8 +313,11 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
                 guard $ not effectiveOnly
                 return moveSofar''
               else do
-                -- TODO: Implement
-                return moveSofar'
+                -- final result
+                let buildTo = listToBB [x | (x, _, _) <- bls]
+                let applyBlocking = if isBlocking buildTo pm lm then setBlocking else id
+                let applyStepping = if isStepping buildTo pm'' lm' then setStepping else id
+                return $ (applyBlocking . applyStepping) moveSofar'
    in if effectiveOnly
         then case find getWin allMoves of
           Just m -> [m] -- one winning move is enough
@@ -353,6 +356,18 @@ hasWinningMove (Just Minotaur) p pm lm =
 -- Others: N[P4 & L2] & L3 & ~P6
 hasWinningMove _ p pm lm =
   getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 2)) .&. (lm ! 3) `andNotBB` (pm ! 6) /= 0
+
+isBlocking :: BitBoard -> PlayerMap -> LevelMap -> Bool
+isBlocking buildTo pmBefore lmBefore =
+  let fromLv0 = getClosedNeighborhood ((pmBefore ! 5) .&. (lmBefore ! 0)) .&. (lmBefore ! 1)
+      fromLv1 = getClosedNeighborhood ((pmBefore ! 5) .&. (lmBefore ! 1)) .&. (lmBefore ! 2)
+   in buildTo .&. (fromLv0 .|. fromLv1) /= 0
+
+isStepping :: BitBoard -> PlayerMap -> LevelMap -> Bool
+isStepping buildTo pmAfter lmAfter =
+  let fromLv0 = getClosedNeighborhood ((pmAfter ! 4) .&. (lmAfter ! 0)) .&. (lmAfter ! 1)
+      fromLv1 = getClosedNeighborhood ((pmAfter ! 4) .&. (lmAfter ! 1)) .&. (lmAfter ! 2)
+   in buildTo .&. (fromLv0 .|. fromLv1) /= 0
 
 --------------------------------------------------------------------------------
 -- Making Moves
