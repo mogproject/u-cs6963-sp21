@@ -1,4 +1,4 @@
-module Search.Search (findMove, searchAlphaBeta, findMoveAlphaBeta, findMoveWithTimeout) where
+module Search.Search (findMove, searchAlphaBeta, searchAlphaBetaNaive, findMoveAlphaBeta, findMoveWithTimeout) where
 
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar (newMVar, swapMVar, takeMVar)
@@ -23,7 +23,7 @@ findMove 2 _ g@GameState {GS.legalMoves = _ : _} =
 -- Alpha-beta (generic): Do not use. Why is this so slow?
 findMove 3 _ g = getNextMove g $ findMoveAlphaBeta g 2
 -- Alpha-beta
-findMove 4 _ g = searchAlphaBetaNaive g 4
+findMove 4 _ g = snd $ searchAlphaBetaNaive g 4
 -- searchAlphaBetaNaive g 4
 --
 findMove _ _ _ = undefined
@@ -35,9 +35,14 @@ findMoveWithTimeout timeoutMicroSeconds g = do
 
   -- Define a function.
   let compute depth = do
-        x <- Control.Exception.evaluate $ searchAlphaBetaNaive g depth
+        (sc, x) <- Control.Exception.evaluate $ searchAlphaBetaNaive g depth
+        -- print $ "depth=" ++ show depth ++ ", score=" ++ show sc ++ ", move=" ++ show x
         _ <- swapMVar mvar x
-        compute $ depth + 1
+        if sc == scoreWin || sc == (- scoreWin)
+          then do
+            -- finish search
+            return ()
+          else compute $ depth + 1
 
   -- Start a new thread.
   tid <- forkIO (compute 1)
@@ -97,10 +102,10 @@ searchMiniMax' g@GameState {GS.legalMoves = mv} depth shouldMaximize sofar =
 -- Alpha-beta Search
 --------------------------------------------------------------------------------
 
-searchAlphaBetaNaive :: GameState -> Int -> GameMove
+searchAlphaBetaNaive :: GameState -> Int -> (Score, GameMove)
 searchAlphaBetaNaive g@GameState {GS.turn = t} depth =
-  let (_, result) = searchAlphaBetaNaive' g depth (- scoreWin) scoreWin (even t) []
-   in if null result then head (getLegalMoves' False g) else last result
+  let (score, result) = searchAlphaBetaNaive' g depth (- scoreWin) scoreWin (even t) []
+   in (score, if null result then head (getLegalMoves' False g) else last result)
 
 searchAlphaBetaNaive' :: GameState -> Int -> Score -> Score -> Bool -> [GameMove] -> (Score, [GameMove])
 -- reached depth limit

@@ -104,7 +104,7 @@ spec = do
 
       -- ==== DEBUG END ====
 
-      let mv = findMove 4 0 s1
+      let mv = snd $ searchAlphaBetaNaive s1 2
 
       getMoveFrom mv `shouldBe` posToIndex (1, 5)
       getMoveTo mv `shouldBe` posToIndex (2, 4)
@@ -129,7 +129,7 @@ spec = do
               }
       let s1 = fromBoard b1
       printAllMoves s1
-      let mv = findMove 4 0 s1
+      let mv = snd $ searchAlphaBetaNaive s1 2
       getLose mv `shouldBe` True
 
   describe "Search#searchAlphaBeta()" $ do
@@ -232,3 +232,50 @@ spec = do
       let f = searchAlphaBeta (nodes Data.Map.!) (scores Data.Map.!) (-1000000000) 1000000000 0
 
       f True 3 `shouldBe` (-12348, [11, 8, 1])
+
+  describe "Search#findMoveWithTimeout()" $ do
+    it "finds a winning move" $ do
+      -- {"players":[{"card":"Artemis","tokens":[[1,4],[5,5]]},{"card":"Pan","tokens":[[2,4],[4,4]]}],"spaces":[[0,0,1,2,0],[0,0,0,0,4],[0,0,0,1,4],[0,2,2,0,4],[0,2,0,2,2]],"turn":26}
+
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Artemis, B.tokens = Just ((1, 4), (5, 5))},
+                    B.Player {B.card = Pan, B.tokens = Just ((2, 4), (4, 4))}
+                  ),
+                B.spaces = [[0, 0, 1, 2, 0], [0, 0, 0, 0, 4], [0, 0, 0, 1, 4], [0, 2, 2, 0, 4], [0, 2, 0, 2, 2]],
+                B.turn = 26
+              }
+      let s1 = fromBoard b1
+      -- printAllMoves s1
+
+      mv <- findMoveWithTimeout 1000000 s1
+
+      getMoveFrom mv `shouldBe` posToIndex (5, 5)
+      getMoveTo mv `shouldBe` posToIndex (5, 4)
+      getBuildAt mv `shouldBe` [(posToIndex (5, 5), 2, 3)]
+
+    it "finds a defensive move" $ do
+      -- {"players":[{"card":"Pan","tokens":[[2,4],[3,4]]},{"card":"Artemis","tokens":[[3,3],[5,5]]}],"spaces":[[1,0,1,2,0],[0,0,1,0,4],[0,0,0,1,4],[0,2,3,0,4],[0,2,0,2,2]],"turn":29}
+
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Pan, B.tokens = Just ((2, 4), (3, 4))},
+                    B.Player {B.card = Artemis, B.tokens = Just ((3, 3), (5, 5))}
+                  ),
+                B.spaces =
+                  [ [1, 0, 1, 2, 0],
+                    [0, 0, 1, 0, 4],
+                    [0, 0, 0, 1, 4],
+                    [0, 2, 3, 0, 4],
+                    [0, 2, 0, 2, 2]
+                  ],
+                B.turn = 29
+              }
+      let s1 = fromBoard b1
+      -- printAllMoves s1
+
+      mv <- findMoveWithTimeout 1000000 s1
+
+      getBuildAt mv `shouldBe` [(posToIndex (4, 3), 3, 4)]

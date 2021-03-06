@@ -40,12 +40,12 @@ type GameMove = Int64
 -- 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000|
 --  x                                                                     | win      | 0: winning move; 1: otherwise
 --   x                                                                    | lose     | 0: otherwise; 1: losing move
---       x                                                                | step bld | 0: build that enables my worker to move up; 1: otherwise
---        x                                                               | block bld| 0: build that disables one of the opponent's moving up; 1: otherwise
---          xxx                                                           | mv to lv | 7 - (move to level)
---                     xxx                                                | bld lv(2)| 7 - (level after build(2))
+--             x                                                          | step bld | 0: build that enables my worker to move up; 1: otherwise
+--              x                                                         | block bld| 0: build that disables one of the opponent's moving up; 1: otherwise
+--               xxx                                                      | mv to lv | 7 - (move to level)
+--      xxx                                                               | bld lv(2)| 7 - (level after build(2))
 --                        xxx                                             | bld bl(2)| level before build(2)
---                            xxx                                         | bld lv(1)| 7 - (level after build(1))
+--          xxx                                                           | bld lv(1)| 7 - (level after build(1))
 --                               xxx                                      | bld bl(1)| level bfter build(1)
 --                                  x                                     | dbl mv   | 0: double move; 1: otherwise
 --                                   x                                    | mv op    | 0: opponent worker is pushed or swapped; 1: otherwise
@@ -64,7 +64,8 @@ showMove x =
       moveTo = (show . indexToPos . getMoveTo) x
       builds = unwords ["(" ++ (show . indexToPos) buildAt ++ ", lv=" ++ show lv ++ ")" | (buildAt, _, lv) <- getBuildAt x]
    in concat
-        [ "Worker[",
+        [ show x,
+          ":Worker[",
           workerId,
           "]@",
           moveFrom,
@@ -104,27 +105,34 @@ setMoveTo = setValue 7 6
 getMoveTo :: Int64 -> Int
 getMoveTo = getValue 7 6
 
+-- build level: 3 -> 1, 4 -> 2, 2 -> 5, 1 -> 6, 0 -> 7
+buildToPriority :: Int -> Int
+buildToPriority x = if x >= 3 then x - 2 else 7 - x
+
+priorityToBuild :: Int -> Int
+priorityToBuild x = if x >= 5 then 7 - x else x + 2
+
 setBuildAt :: [(Int, Int, Int)] -> Int64 -> Int64
-setBuildAt [(bl, blb, bll)] = setValue 13 6 bl . setValue 34 3 blb . setValue 37 3 (7 - bll)
+setBuildAt [(bl, blb, bll)] = setValue 13 6 bl . setValue 34 3 blb . setValue 53 3 (buildToPriority bll)
 setBuildAt [(bl1, blb1, bll1), (bl2, blb2, bll2)] =
-  (setValue 19 6 bl2 . setValue 40 3 blb2 . setValue 43 3 (7 - bll2)) . setBuildAt [(bl1, blb1, bll1)]
+  (setValue 19 6 bl2 . setValue 40 3 blb2 . setValue 56 3 (buildToPriority bll2)) . setBuildAt [(bl1, blb1, bll1)]
 setBuildAt _ = undefined
 
 getBuildAt :: Int64 -> [(Int, Int, Int)]
 getBuildAt x =
   let blb1 = getValue 34 3 x
-      bll1 = 7 - getValue 37 3 x
+      bll1 = priorityToBuild $ getValue 53 3 x
    in if bll1 == 0
         then []
         else
           let blb2 = getValue 40 3 x
-              bll2 = 7 - getValue 43 3 x
+              bll2 = priorityToBuild $ getValue 56 3 x
            in if bll2 == 0
                 then [(getValue 13 6 x, blb1, bll1)]
                 else [(getValue 13 6 x, blb1, bll1), (getValue 19 6 x, blb2, bll2)]
 
 setMoveToLevel :: Int -> Int64 -> Int64
-setMoveToLevel lv = setValue 52 3 (7 - lv)
+setMoveToLevel lv = setValue 48 3 (7 - lv)
 
 setOpponentMove :: Int -> Int -> Int64 -> Int64
 setOpponentMove wid moveTo = setValue 32 1 0 . setValue 26 6 moveTo . setValue 25 1 wid
@@ -155,7 +163,7 @@ setDefence :: Int64 -> Int64
 setDefence = setValue 45 1 0
 
 setBlocking :: Int64 -> Int64
-setBlocking = setValue 56 1 0
+setBlocking = setValue 51 1 0
 
 setStepping :: Int64 -> Int64
-setStepping = setValue 57 1 0
+setStepping = setValue 52 1 0
