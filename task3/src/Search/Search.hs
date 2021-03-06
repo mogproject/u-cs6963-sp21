@@ -12,35 +12,33 @@ import Game.Evaluation (Score, evaluate, evaluate', scoreWin)
 import Game.GameMove
 import Game.GameState (GameState (GameState), getLegalMoves', makeMove)
 import qualified Game.GameState as GS
+import System.Random (StdGen)
 
-findMove :: Int -> Int -> GameState -> GameMove
+findMove :: Int -> StdGen -> Maybe Int -> GameState -> GameMove
 -- Only one choise
-findMove _ _ GameState {GS.legalMoves = [m]} = m
+findMove _ _ _ GameState {GS.legalMoves = [m]} = m
 -- Naive: choose the first legal move
-findMove 1 _ GameState {GS.legalMoves = m : _} = m
+findMove 1 _ _ GameState {GS.legalMoves = m : _} = m
 -- Minimax
-findMove 2 _ g@GameState {GS.legalMoves = _ : _} =
-  let depth = 2
-   in searchMiniMax g depth
+findMove 2 _ (Just depth) g@GameState {GS.legalMoves = _ : _} = searchMiniMax g depth
 -- Alpha-beta (generic): Do not use. Why is this so slow?
-findMove 3 _ g = getNextMove g $ findMoveAlphaBeta g 2
+findMove 3 _ (Just depth) g = getNextMove g $ findMoveAlphaBeta g depth
 -- Alpha-beta
-findMove 4 _ g = snd $ searchAlphaBetaNaive g 4
--- searchAlphaBetaNaive g 4
---
-findMove _ _ _ = undefined
+findMove 4 _ (Just depth) g = snd $ searchAlphaBetaNaive g depth
+-- (unexpected strategy or no valid moves)
+findMove _ _ _ _ = undefined
 
-findMoveWithTimeout :: Int -> GameState -> IO GameMove
-findMoveWithTimeout timeoutMicroSeconds g = do
+findMoveWithTimeout :: Int -> Maybe Int -> GameState -> IO GameMove
+findMoveWithTimeout timeoutMicroSeconds depthLimit g = do
   -- Create a synchronized mutable variable.
   mvar <- newMVar $ head (getLegalMoves' False g)
-  
+
   -- Define a function.
   let compute depth = do
         (sc, x) <- Control.Exception.evaluate $ searchAlphaBetaNaive g depth
         -- print $ "depth=" ++ show depth ++ ", score=" ++ show sc ++ ", move=" ++ show x
         _ <- swapMVar mvar $! x
-        if sc == scoreWin || sc == (- scoreWin)
+        if sc == scoreWin || sc == (- scoreWin) || maybe False (depth >=) depthLimit
           then do
             -- finish search
             return ()
@@ -48,7 +46,7 @@ findMoveWithTimeout timeoutMicroSeconds g = do
 
   -- Start a new thread.
   tid <- forkIO (compute 1)
-  
+
   -- Wait and kill the thread.
   threadDelay timeoutMicroSeconds
   killThread tid

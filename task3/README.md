@@ -29,3 +29,11 @@ $ ./scripts/wrapper.sh < ./scripts/test_input.txt
 
 - Check `santorini-player.prof`.
 
+
+## Tournament
+
+```
+$ source ./scripts/environ.sh
+$ $tn --timeout 10 ./scripts/wrapper_to.sh $pr > ./data/xxxx.txt 2> ./data/xxxx.err
+$ $tn --timeout 10 --all-cards ./scripts/wrapper_to.sh $pr > ./data/xxxx.txt 2> ./data/xxxx.err
+```

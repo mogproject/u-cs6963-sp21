@@ -11,7 +11,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import System.Random (StdGen, mkStdGen, randomR)
+import System.Random (StdGen, randomR)
 
 allPositions :: Set Pos
 allPositions = Set.fromList [(x, y) | x <- [1 .. 5], y <- [1 .. 5]]
@@ -21,16 +21,16 @@ retrieveElement rnd xs =
   let (n, gen) = randomR (0, Set.size xs - 1) rnd
    in (Set.elemAt n xs, Set.deleteAt n xs, gen)
 
-findStartingPlayer1 :: Int -> Int -> Maybe (Card, Card) -> Workers
+findStartingPlayer1 :: Int -> StdGen -> Maybe (Card, Card) -> Workers
 -- Strategy 0: random
-findStartingPlayer1 strategy seed _
-  | strategy == 0 =
-    let r0 = mkStdGen seed
-        (w1, ys, r1) = retrieveElement r0 allPositions
-        (w2, _, _) = retrieveElement r1 ys
-     in (w1, w2)
--- Strategy 1: fixed position
-findStartingPlayer1 strategy _ _ | strategy == 1 = ((4, 4), (5, 5))
+findStartingPlayer1 0 gen _ =
+  let (w1, ys, r1) = retrieveElement gen allPositions
+      (w2, _, _) = retrieveElement r1 ys
+   in (w1, w2)
+-- Strategy 1: fixed position + randomized
+findStartingPlayer1 1 gen _ =
+  let (n, _) = randomR (0, 3) gen
+   in [((4, 4), (5, 5)), ((2, 2), (1, 1)), ((2, 4), (1, 5)), ((4, 2), (5, 1))] !! n
 findStartingPlayer1 _ _ _ = undefined
 
 player2TableBasis :: Map Workers Workers
@@ -98,16 +98,14 @@ player2Table = (update swap . update syms') player2TableBasis
     syms' (w1, w2) = zip (syms w1) (syms w2)
     swap (w1, w2) = [(w2, w1)]
 
-findStartingPlayer2 :: Int -> Int -> Workers -> Maybe (Card, Card) -> Workers
+findStartingPlayer2 :: Int -> StdGen -> Workers -> Maybe (Card, Card) -> Workers
 -- Strategy 0: random
-findStartingPlayer2 strategy seed (u1, u2) _
-  | strategy == 0 =
-    let r0 = mkStdGen seed
-        xs = Set.delete u2 (Set.delete u1 allPositions)
-        (w1, ys, r1) = retrieveElement r0 xs
-        (w2, _, _) = retrieveElement r1 ys
-     in (w1, w2)
+findStartingPlayer2 0 gen (u1, u2) _ =
+  let xs = Set.delete u2 (Set.delete u1 allPositions)
+      (w1, ys, r1) = retrieveElement gen xs
+      (w2, _, _) = retrieveElement r1 ys
+   in (w1, w2)
 -- Strategy 1: predetermined position
-findStartingPlayer2 strategy seed ws c
-  | strategy == 1 = Map.findWithDefault (findStartingPlayer2 0 seed ws c) ws player2Table
+findStartingPlayer2 1 gen ws c =
+  Map.findWithDefault (findStartingPlayer2 0 gen ws c) ws player2Table
 findStartingPlayer2 _ _ _ _ = undefined
