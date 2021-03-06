@@ -341,7 +341,7 @@ hasWinningMove (Just Pan) p pm lm =
 hasWinningMove (Just Artemis) p pm lm =
   let x = (pm ! (4 + p)) `andNotBB` (lm ! 0) -- Artemis workers at Lv 1, 2, or 3
       a = getClosedNeighborhood ((lm ! 3) `andNotBB` (pm ! 6)) .&. (lm ! 2) -- Lv2 spaces next to empty Lv3
-      b = getClosedNeighborhood x .&. (pm ! 6) -- Artemis workers' empty neighbors
+      b = getClosedNeighborhood x `andNotBB` (pm ! 6) -- Artemis workers' empty neighbors
    in a .&. (x .|. b) /= 0
 -- Minotaur
 hasWinningMove (Just Minotaur) p pm lm =

@@ -542,6 +542,19 @@ spec = do
       hasWinningMove (Just Apollo) 0 pm1' lm `shouldBe` True
       hasWinningMove (Just Apollo) 1 pm1 lm `shouldBe` True
 
+    it "works with Artemis" $ do
+      let pm1 = createPlayerMap [[ri 2 4, ri 3 4], [ri 3 3, ri 5 5]]
+      let lv = Map.fromList $
+              (zip validIndices . concat)
+                  [ [1, 0, 1, 2, 0],
+                    [0, 0, 1, 0, 4],
+                    [0, 0, 0, 1, 4],
+                    [0, 2, 3, 0, 4],
+                    [0, 2, 0, 2, 2]
+                  ]
+      let lm = createLevelMap lv
+      hasWinningMove (Just Artemis) 1 pm1 lm `shouldBe` True
+
   describe "GameState#makeMove()" $ do
     it "has no side effects" $ do
       let b1 =
