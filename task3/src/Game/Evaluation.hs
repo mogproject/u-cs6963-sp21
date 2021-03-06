@@ -67,11 +67,34 @@ evalReachTable =
         [0, 0, 0, 0, 0, 0, 0, 0] -- level 4
       ]
 
+evalReachTableForPan :: V.Vector Score
+evalReachTableForPan =
+  V.fromList $
+    concat
+      [ -- turn to move (advantageous)
+        [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
+        [10000, 200, 40, 30, 20, 15, 12, 0], -- level 1
+        [30000, 12000, 500, 200, 150, 120, 110, 0], -- level 2
+        [30000, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3
+        [0, 0, 0, 0, 0, 0, 0, 0], -- level 4
+
+        -- not turn to move
+        [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
+        [10000, 100, 40, 30, 20, 15, 12, 0], -- level 1
+        [30000, 11000, 500, 200, 150, 120, 110, 0], -- level 2
+        [30000, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3
+        [0, 0, 0, 0, 0, 0, 0, 0] -- level 4
+      ]
+
 evalReachTableSize :: Int
 evalReachTableSize = V.length evalReachTable `div` 10
 
-getReachTableValue :: Int -> Int -> Int -> Score
-getReachTableValue player lev dist = evalReachTable V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist')
+getReachTableValue :: Maybe Card -> Int -> Int -> Int -> Score
+getReachTableValue (Just Pan) player lev dist = evalReachTableForPan V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist')
+  where
+    dist' = min (evalReachTableSize - 1) dist
+
+getReachTableValue _ player lev dist = evalReachTable V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist')
   where
     dist' = min (evalReachTableSize - 1) dist
 
@@ -102,9 +125,6 @@ evalStuckBonus = 25000
 
 evalPreventionAdvantage :: Score
 evalPreventionAdvantage = 20000
-
-evalPanBonus :: Score
-evalPanBonus = 25000
 
 --------------------------------------------------------------------------------
 -- Distance Computation
@@ -163,11 +183,10 @@ evaluate
           (dist, bestDist) = getDistances cs pl adj
           funcs =
             [ evaluateWorkerProximity pl dist,
-              evaluateReachability lv bestDist,
+              evaluateReachability cs lv bestDist,
               evaluateAsymmetry pl lv lm bestDist,
               evaluateStuckBonus pl adj,
-              evaluatePrevention pl lv lm bestDist,
-              evaluatePanBonus cs pl lv
+              evaluatePrevention pl lv lm bestDist
             ]
        in sign * sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
     where
@@ -189,8 +208,8 @@ evaluateWorkerProximity :: Players -> [[IntMap Int]] -> Int -> Score
 evaluateWorkerProximity pl dist p = sum [getProxTableValue (dist !! p !! w ! (pl !! p !! (1 - w))) | w <- [0, 1]]
 
 -- (2) Reachability
-evaluateReachability :: Levels -> [IntMap Int] -> Int -> Score
-evaluateReachability lv dist p = sum [getReachTableValue p (lv ! i) (dist !! p ! i) | i <- validIndices]
+evaluateReachability :: Cards -> Levels -> [IntMap Int] -> Int -> Score
+evaluateReachability cs lv dist p = sum [getReachTableValue (cs !! p) p (lv ! i) (dist !! p ! i) | i <- validIndices]
 
 -- (3) Asymmetry
 evaluateAsymmetry :: Players -> Levels -> LevelMap -> [IntMap Int] -> Int -> Score
@@ -216,13 +235,6 @@ evaluatePrevention pl lv lm dist p = sum [f index | w <- [0, 1], let index = pl 
             then evalPreventionAdvantage
             else 0
 
--- (6) Pan's Level 2 Bonus
-evaluatePanBonus :: Cards -> Players -> Levels -> Int -> Score
-evaluatePanBonus cs pl lv p =
-  if Pan `elem` (cs !! p)
-    then sum [if lv ! w == 2 then evalPanBonus else 0 | w <- pl !! p]
-    else 0
-
 --------------------------------------------------------------------------------
 -- For unit testing
 --------------------------------------------------------------------------------
@@ -231,7 +243,7 @@ evaluateWorkerProximity' :: GameState -> Int -> Score
 evaluateWorkerProximity' GameState {cards = cs, players = pl, levels = lv, levelMap = lm} = evaluateWorkerProximity pl (fst $ getDistances cs pl (createAdjacencyList lv lm))
 
 evaluateReachability' :: GameState -> Int -> Score
-evaluateReachability' GameState {cards = cs, players = pl, levels = lv, levelMap = lm} = evaluateReachability lv (snd $ getDistances cs pl (createAdjacencyList lv lm))
+evaluateReachability' GameState {cards = cs, players = pl, levels = lv, levelMap = lm} = evaluateReachability cs lv (snd $ getDistances cs pl (createAdjacencyList lv lm))
 
 evaluateAsymmetry' :: GameState -> Int -> Score
 evaluateAsymmetry' GameState {cards = cs, players = pl, levels = lv, levelMap = lm} = evaluateAsymmetry pl lv lm (snd $ getDistances cs pl (createAdjacencyList lv lm))
