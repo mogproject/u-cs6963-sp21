@@ -1,11 +1,13 @@
 module Search.Search (findMove, searchAlphaBeta, searchAlphaBetaNaive, findMoveAlphaBeta, findMoveWithTimeout) where
 
 import Control.Concurrent (forkIO, killThread, threadDelay)
+-- import Control.Concurrent.MVar (newEmptyMVar, newMVar, putMVar, readMVar, swapMVar, takeMVar, tryTakeMVar)
 import Control.Concurrent.MVar (newMVar, swapMVar, takeMVar)
 import qualified Control.Exception
 import Data.List (maximumBy, minimumBy)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
+-- import Data.Time.Clock (addUTCTime, getCurrentTime, secondsToNominalDiffTime)
 import Game.Evaluation (Score, evaluate, evaluate', scoreWin)
 import Game.GameMove
 import Game.GameState (GameState (GameState), getLegalMoves', makeMove)
@@ -31,13 +33,13 @@ findMove _ _ _ = undefined
 findMoveWithTimeout :: Int -> GameState -> IO GameMove
 findMoveWithTimeout timeoutMicroSeconds g = do
   -- Create a synchronized mutable variable.
-  mvar <- newMVar (head (getLegalMoves' False g))
-
+  mvar <- newMVar $ head (getLegalMoves' False g)
+  
   -- Define a function.
   let compute depth = do
         (sc, x) <- Control.Exception.evaluate $ searchAlphaBetaNaive g depth
         -- print $ "depth=" ++ show depth ++ ", score=" ++ show sc ++ ", move=" ++ show x
-        _ <- swapMVar mvar x
+        _ <- swapMVar mvar $! x
         if sc == scoreWin || sc == (- scoreWin)
           then do
             -- finish search
@@ -46,7 +48,7 @@ findMoveWithTimeout timeoutMicroSeconds g = do
 
   -- Start a new thread.
   tid <- forkIO (compute 1)
-
+  
   -- Wait and kill the thread.
   threadDelay timeoutMicroSeconds
   killThread tid
