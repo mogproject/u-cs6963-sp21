@@ -1,5 +1,8 @@
-module Search.Search (findMove, searchAlphaBeta, findMoveAlphaBeta) where
+module Search.Search (findMove, searchAlphaBeta, findMoveAlphaBeta, findMoveWithTimeout) where
 
+import Control.Concurrent (forkIO, killThread, threadDelay)
+import Control.Concurrent.MVar (newMVar, swapMVar, takeMVar)
+import qualified Control.Exception
 import Data.List (maximumBy, minimumBy)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
@@ -21,8 +24,30 @@ findMove 2 _ g@GameState {GS.legalMoves = _ : _} =
 findMove 3 _ g = getNextMove g $ findMoveAlphaBeta g 2
 -- Alpha-beta
 findMove 4 _ g = searchAlphaBetaNaive g 4
+-- searchAlphaBetaNaive g 4
 --
 findMove _ _ _ = undefined
+
+findMoveWithTimeout :: Int -> GameState -> IO GameMove
+findMoveWithTimeout timeoutMicroSeconds g = do
+  -- Create a synchronized mutable variable.
+  mvar <- newMVar (head (getLegalMoves' False g))
+
+  -- Define a function.
+  let compute depth = do
+        x <- Control.Exception.evaluate $ searchAlphaBetaNaive g depth
+        _ <- swapMVar mvar x
+        compute $ depth + 1
+
+  -- Start a new thread.
+  tid <- forkIO (compute 1)
+
+  -- Wait and kill the thread.
+  threadDelay timeoutMicroSeconds
+  killThread tid
+
+  -- Get the final result.
+  takeMVar mvar
 
 --------------------------------------------------------------------------------
 -- Wrappers
@@ -87,7 +112,7 @@ searchAlphaBetaNaive' g@GameState {GS.legalMoves = mv} depth alpha beta shouldMa
     (Just sc, Nothing) -> (sc, sofar) -- terminal node
     (Just sc, Just m) -> (sc, m : sofar) -- terminal node
     (Nothing, _) ->
-      let nextStates = fmap (makeMove g) (take (depth * 20) mv) -- branch cut
+      let nextStates = fmap (makeMove g) mv --(take (depth * 20) mv) -- branch cut
           bestScore = if shouldMaximize then - scoreWin - 1 else scoreWin + 1
        in searchAlphaBetaNaive'' (zip mv nextStates) depth alpha beta shouldMaximize sofar (bestScore, [])
 
