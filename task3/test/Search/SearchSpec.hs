@@ -13,6 +13,7 @@ import Game.GameState (GameState (legalMoves), fromBoard, makeMove)
 import Search.Search
 import Test.Hspec
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
+import System.Random ( mkStdGen )
 
 printAllMoves :: GameState -> IO ()
 printAllMoves st = putStr $ unlines [showMove m ++ ": " ++ show (evaluate (makeMove st m)) | m <- legalMoves st]
@@ -38,7 +39,7 @@ spec = do
       let s61 = "{\"players\":[{\"card\":\"Artemis\",\"tokens\":[[2,2],[3,4]]},{\"card\":\"Apollo\",\"tokens\":[[1,3],[4,2]]}],\"spaces\":[[2,4,1,4,4],[4,2,4,2,2],[2,4,2,2,2],[2,2,4,4,4],[4,4,4,1,0]],\"turn\":70}"
       let b61 = fromBoard $ fromMaybe undefined (readBoard s61)
 
-      findMove 4 0 b61 > 0 `shouldBe` True
+      findMove 4 (mkStdGen 0) (Just 3) b61 > 0 `shouldBe` True
 
     it "finds a defensive move" $ do
       let b1 =
@@ -67,7 +68,7 @@ spec = do
 
       -- print $ map (maybe undefined showMove . snd) history
 
-      let mv = findMove 3 0 s1
+      let mv = findMove 4 (mkStdGen 0) (Just 3) s1
       -- print "chosen"
       -- putStr $ showMove mv
 
@@ -249,7 +250,7 @@ spec = do
       let s1 = fromBoard b1
       -- printAllMoves s1
 
-      mv <- findMoveWithTimeout 1000000 s1
+      mv <- findMoveWithTimeout 1000000 Nothing s1
 
       getMoveFrom mv `shouldBe` posToIndex (5, 5)
       getMoveTo mv `shouldBe` posToIndex (5, 4)
@@ -276,6 +277,42 @@ spec = do
       let s1 = fromBoard b1
       -- printAllMoves s1
 
-      mv <- findMoveWithTimeout 1000000 s1
+      mv <- findMoveWithTimeout 1000000 Nothing s1
 
       getBuildAt mv `shouldBe` [(posToIndex (4, 3), 3, 4)]
+
+    it "finds a defensive move" $ do
+      -- {"players":[{"card":"Artemis","tokens":[[3,5],[4,1]]},{"card":"Prometheus","tokens":[[4,3],[4,4]]}],"spaces":[[0,3,0,0,0],[3,0,0,0,0],[0,2,0,4,1],[0,4,2,2,0],[1,1,4,0,0]],"style":{"desc":false,"players":["./bin/yo-2021-03-06","bin/play-rate"]},"turn":22}
+
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Artemis, B.tokens = Just ((3,5), (4,1))},
+                    B.Player {B.card = Prometheus, B.tokens = Just ((4,3), (4,4))}
+                  ),
+                B.spaces =[[0,3,0,0,0],[3,0,0,0,0],[0,2,0,4,1],[0,4,2,2,0],[1,1,4,0,0]],
+                B.turn = 29
+              }
+      let s1 = fromBoard b1
+      -- printAllMoves s1
+
+      -- let mv1p = findMove 4 (mkStdGen 0) (Just 1) s1
+      -- getBuildAt mv1p `shouldBe` [(posToIndex (2, 1), 3, 4)]
+
+      -- let mv1q = findMove 4 (mkStdGen 0) (Just 2) s1
+      -- getBuildAt mv1q `shouldBe` [(posToIndex (2, 1), 3, 4)]
+
+      -- let mv1a = findMove 4 (mkStdGen 0) (Just 3) s1
+      -- getBuildAt mv1a `shouldBe` [(posToIndex (2, 1), 3, 4)]
+
+      -- let mv1b = findMove 4 (mkStdGen 0) (Just 4) s1
+      -- getBuildAt mv1b `shouldBe` [(posToIndex (2, 1), 3, 4)]  
+      
+      mv2a <- findMoveWithTimeout 5000000 (Just 3) s1
+      getBuildAt mv2a `shouldBe` [(posToIndex (2, 1), 3, 4)]
+
+      mv2b <- findMoveWithTimeout 5000000 (Just 4) s1  -- acknowledges the loss
+      getBuildAt mv2b `shouldBe` [(posToIndex (2, 1), 3, 4)]
+
+      mv2c <- findMoveWithTimeout 5000000 Nothing s1
+      getBuildAt mv2c `shouldBe` [(posToIndex (2, 1), 3, 4)]

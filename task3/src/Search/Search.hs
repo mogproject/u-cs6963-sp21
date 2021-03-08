@@ -5,12 +5,12 @@ import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar (newMVar, swapMVar, takeMVar)
 import qualified Control.Exception
 import Data.List (maximumBy, minimumBy)
-import Data.Maybe (fromMaybe)
+-- import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 -- import Data.Time.Clock (addUTCTime, getCurrentTime, secondsToNominalDiffTime)
 import Game.Evaluation (Score, evaluate, evaluate', scoreWin)
 import Game.GameMove
-import Game.GameState (GameState (GameState), getLegalMoves', makeMove)
+import Game.GameState (GameState (GameState, turn), getLegalMoves', makeMove)
 import qualified Game.GameState as GS
 import System.Random (StdGen)
 
@@ -22,8 +22,8 @@ findMove 1 _ _ GameState {GS.legalMoves = m : _} = m
 -- Minimax
 findMove 2 _ (Just depth) g@GameState {GS.legalMoves = _ : _} = searchMiniMax g depth
 -- Alpha-beta (generic): Do not use. Why is this so slow?
-findMove 3 _ (Just depth) g = getNextMove g $ findMoveAlphaBeta g depth
--- Alpha-beta
+-- findMove 3 _ (Just depth) g = getNextMove g $ findMoveAlphaBeta g depth
+-- -- Alpha-beta
 findMove 4 _ (Just depth) g = snd $ searchAlphaBetaNaive g depth
 -- (unexpected strategy or no valid moves)
 findMove _ _ _ _ = undefined
@@ -37,12 +37,17 @@ findMoveWithTimeout timeoutMicroSeconds depthLimit g = do
   let compute depth = do
         (sc, x) <- Control.Exception.evaluate $ searchAlphaBetaNaive g depth
         -- print $ "depth=" ++ show depth ++ ", score=" ++ show sc ++ ", move=" ++ show x
-        _ <- swapMVar mvar $! x
-        if sc == scoreWin || sc == (- scoreWin) || maybe False (depth >=) depthLimit
+        if sc == scoreWin * (if even (turn g) then (-1) else 1)
           then do
-            -- finish search
-            return ()
-          else compute $ depth + 1
+            return () -- do not update the move if it finds the loss because it tends to a worse move
+          else do
+            _ <- swapMVar mvar $! x
+
+            if sc == scoreWin || sc == (- scoreWin) || maybe False (depth >=) depthLimit
+              then do
+                -- finish search
+                return ()
+              else compute $ depth + 1
 
   -- Start a new thread.
   tid <- forkIO (compute 1)
@@ -72,8 +77,8 @@ createBranches (s@GameState {GS.legalMoves = mv}, _) =
 scoreNode :: SearchNode -> Score
 scoreNode = evaluate . fst
 
-getNextMove :: GameState -> (Score, [SearchNode]) -> GameMove
-getNextMove s (_, xs) = if null xs then head (getLegalMoves' False s) else fromMaybe undefined $ (last . map snd) xs
+-- getNextMove :: GameState -> (Score, [SearchNode]) -> GameMove
+-- getNextMove s (_, xs) = if null xs then head (getLegalMoves' False s) else fromMaybe undefined $ (last . map snd) xs
 
 findMoveAlphaBeta :: GameState -> Int -> (Score, [SearchNode])
 findMoveAlphaBeta g@GameState {GS.turn = t, GS.legalMoves = _ : _} depth = searchAlphaBeta createBranches scoreNode (- scoreWin) scoreWin (createRoot g) (even t) depth
