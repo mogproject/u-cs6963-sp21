@@ -114,3 +114,12 @@ $ mkdir log
 $ ./bin/tournament --all-cards --rounds 5 ./bin/play-rate ./bin/yo-2021-03-06 > log/t-2021-03-06.log 2> log/t-2021-03-06.err
 ```
 
+- Download an analyze results
+
+```
+$ scp -r cade:santorini/log .
+$ tail ./log/t-2021-03-06.err
+$ ./scripts/split_tn.py ./log/t-2021-03-06
+$ ./scripts/summarize_tn.py < ./log/t-2021-03-06.err |grep WIN
+```
+
