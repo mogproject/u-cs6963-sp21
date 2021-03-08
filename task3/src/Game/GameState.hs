@@ -16,6 +16,7 @@ module Game.GameState
     Index,
     Cards,
     Players,
+    PlayerMap,
     Levels,
     LevelMap,
     getLegalMoves',

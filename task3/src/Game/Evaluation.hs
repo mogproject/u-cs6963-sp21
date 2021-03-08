@@ -12,7 +12,7 @@ module Game.Evaluation
 where
 
 import Data.Bits (complement, (.&.), (.|.))
-import Data.Card ( Card(Pan, Apollo, Minotaur, Artemis) )
+import Data.Card (Card (Apollo, Artemis, Minotaur, Pan, Prometheus))
 import Data.IntMap (IntMap, (!))
 import qualified Data.IntMap as Map
 import Data.Sequence (Seq)
@@ -38,7 +38,7 @@ scoreWin :: Score
 scoreWin = 1000000000 -- 1e9
 
 evalProxTable :: V.Vector Score
-evalProxTable = V.fromList [0, 100, 80, 50, 20, 0]
+evalProxTable = V.fromList [0, 10000, 8000, 5000, 2000, 0]
 
 evalProxTableSize :: Int
 evalProxTableSize = V.length evalProxTable
@@ -55,14 +55,14 @@ evalReachTable =
       [ -- turn to move (advantageous)
         [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
         [300, 200, 40, 30, 20, 15, 12, 0], -- level 1
-        [10000, 2000, 500, 200, 150, 120, 110, 0], -- level 2
+        [15000, 2000, 500, 200, 150, 120, 110, 0], -- level 2
         [0, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3 (staying at lv 3 is not advantageous)
         [0, 0, 0, 0, 0, 0, 0, 0], -- level 4
 
         -- not turn to move
         [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
         [300, 100, 40, 30, 20, 15, 12, 0], -- level 1
-        [10000, 1000, 500, 200, 150, 120, 110, 0], -- level 2
+        [15000, 1000, 500, 200, 150, 120, 110, 0], -- level 2
         [0, 10000, 5000, 2000, 1000, 500, 300, 0], -- level 3
         [0, 0, 0, 0, 0, 0, 0, 0] -- level 4
       ]
@@ -74,7 +74,7 @@ evalReachTableForPan =
       [ -- turn to move (advantageous)
         [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
         [10000, 200, 40, 30, 20, 15, 12, 0], -- level 1
-        [30000, 12000, 500, 200, 150, 120, 110, 0], -- level 2
+        [30000, 12000, 500, 200, 150, 120, 110, 0], -- level 2 (bias towards moving up to lv 2)
         [30000, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3
         [0, 0, 0, 0, 0, 0, 0, 0], -- level 4
 
@@ -93,7 +93,6 @@ getReachTableValue :: Maybe Card -> Int -> Int -> Int -> Score
 getReachTableValue (Just Pan) player lev dist = evalReachTableForPan V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist')
   where
     dist' = min (evalReachTableSize - 1) dist
-
 getReachTableValue _ player lev dist = evalReachTable V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist')
   where
     dist' = min (evalReachTableSize - 1) dist
@@ -125,6 +124,15 @@ evalStuckBonus = 25000
 
 evalPreventionAdvantage :: Score
 evalPreventionAdvantage = 20000
+
+evalPrometeus312 :: Score
+evalPrometeus312 = 40000
+
+evalPrometeus322 :: Score
+evalPrometeus322 = 70000
+
+evalPrometeus323 :: Score
+evalPrometeus323 = 100000
 
 --------------------------------------------------------------------------------
 -- Distance Computation
@@ -171,7 +179,7 @@ evaluate
   g@GameState
     { cards = cs,
       players = pl,
-      playerMap = _,
+      playerMap = pm,
       levels = lv,
       levelMap = lm,
       turn = t,
@@ -186,7 +194,8 @@ evaluate
               evaluateReachability cs lv bestDist,
               evaluateAsymmetry pl lv lm bestDist,
               evaluateStuckBonus pl adj,
-              evaluatePrevention pl lv lm bestDist
+              evaluatePrevention pl lv lm bestDist,
+              evaluatePrometeusBonus cs pm lm
             ]
        in sign * sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
     where
@@ -234,6 +243,24 @@ evaluatePrevention pl lv lm dist p = sum [f index | w <- [0, 1], let index = pl 
        in if nbrs > 0 && minimum [dist !! (1 - p) ! u | u <- bbToList nbrs] >= 2
             then evalPreventionAdvantage
             else 0
+
+-- (6) Prometeus Bonus
+evaluatePrometeusBonus :: Cards -> PlayerMap -> LevelMap -> Int -> Score
+evaluatePrometeusBonus cs pm lm p =
+  if cs !! p == Just Prometheus
+    then
+      let lv3nbr = getClosedNeighborhood (lm ! 3) `andNotBB` (pm ! (5 - p))
+       in if getClosedNeighborhood (lv3nbr .&. (pm ! (4 + p)) .&. (lm ! 1)) .&. (lm ! 2) `andNotBB` (pm ! 6) /= 0
+            then -- Pattern 3-*1-2
+              evalPrometeus312
+            else
+              if getClosedNeighborhood (lv3nbr .&. ((lm ! 1) .|. (lm ! 2))) .&. (lm ! 2) .&. (pm ! (4 + p)) /= 0
+                then evalPrometeus322 -- Pattern 3-(1or2)-*2
+                else
+                  if getClosedNeighborhood (lv3nbr .&. (pm ! (4 + p)) .&. (lm ! 2)) .&. (lm ! 3) `andNotBB` (pm ! 6) /= 0
+                    then evalPrometeus323 -- Pattern 3-*2-3
+                    else 0
+    else 0
 
 --------------------------------------------------------------------------------
 -- For unit testing

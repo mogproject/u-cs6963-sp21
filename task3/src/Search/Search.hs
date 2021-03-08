@@ -2,7 +2,7 @@ module Search.Search (findMove, searchAlphaBeta, searchAlphaBetaNaive, findMoveA
 
 import Control.Concurrent (forkIO, killThread, threadDelay)
 -- import Control.Concurrent.MVar (newEmptyMVar, newMVar, putMVar, readMVar, swapMVar, takeMVar, tryTakeMVar)
-import Control.Concurrent.MVar (newMVar, swapMVar, takeMVar)
+import Control.Concurrent.MVar (newEmptyMVar, newMVar, putMVar, swapMVar, takeMVar)
 import qualified Control.Exception
 import Data.List (maximumBy, minimumBy)
 -- import Data.Maybe (fromMaybe)
@@ -32,6 +32,7 @@ findMoveWithTimeout :: Int -> Maybe Int -> GameState -> IO GameMove
 findMoveWithTimeout timeoutMicroSeconds depthLimit g = do
   -- Create a synchronized mutable variable.
   mvar <- newMVar $ head (getLegalMoves' False g)
+  done <- newEmptyMVar
 
   -- Define a function.
   let compute depth = do
@@ -39,6 +40,7 @@ findMoveWithTimeout timeoutMicroSeconds depthLimit g = do
         -- print $ "depth=" ++ show depth ++ ", score=" ++ show sc ++ ", move=" ++ show x
         if sc == scoreWin * (if even (turn g) then (-1) else 1)
           then do
+            putMVar done True
             return () -- do not update the move if it finds the loss because it tends to a worse move
           else do
             _ <- swapMVar mvar $! x
@@ -46,14 +48,21 @@ findMoveWithTimeout timeoutMicroSeconds depthLimit g = do
             if sc == scoreWin || sc == (- scoreWin) || maybe False (depth >=) depthLimit
               then do
                 -- finish search
+                putMVar done True
                 return ()
               else compute $ depth + 1
 
-  -- Start a new thread.
+  let timer = do
+        threadDelay timeoutMicroSeconds
+        putMVar done True
+        return ()
+
+  -- Start new threads.
   tid <- forkIO (compute 1)
+  _ <- forkIO timer
 
   -- Wait and kill the thread.
-  threadDelay timeoutMicroSeconds
+  _ <- takeMVar done
   killThread tid
 
   -- Get the final result.
