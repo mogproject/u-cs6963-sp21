@@ -322,7 +322,27 @@ spec = do
       -- let s2 = makeMove s1 $ legalMoves s1 !! 6
       -- printAllMoves s2
 
-      -- FIXME: decrease time limit
       mv2c <- findMoveWithTimeout 5000000 Nothing s1
       -- print (showMove mv2c)    -- Worker[2]@(5,2) -> (3,1): ((2,1), lv=4)
       getBuildAt mv2c `shouldBe` [(posToIndex (2, 1), 3, 4)]
+
+    it "finds a defensive move" $ do
+      -- {"players":[{"card":"Artemis","tokens":[[4,3],[4,5]]},{"card":"Prometheus","tokens":[[3,3],[4,4]]}],"spaces":[[0,0,0,0,0],[0,0,0,0,0],[0,1,2,0,0],[1,1,0,0,0],[1,1,0,2,0]],"turn":7}
+
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Artemis, B.tokens = Just ((4, 3), (4, 5))},
+                    B.Player {B.card = Prometheus, B.tokens = Just ((3, 3), (4, 4))}
+                  ),
+                B.spaces = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 1, 2, 0, 0], [1, 1, 0, 0, 0], [1, 1, 0, 2, 0]],
+                B.turn = 7
+              }
+      let s1 = fromBoard b1
+
+      -- let s2 = makeMove s1 $ legalMoves s1 !! 6
+      -- printAllMoves s2
+
+      -- FIXME: decrease time limit
+      mv <- findMoveWithTimeout 5000000 Nothing s1
+      any (\p -> getMoveTo mv == p) [posToIndex (3, 2), posToIndex (4, 2)] `shouldBe` True

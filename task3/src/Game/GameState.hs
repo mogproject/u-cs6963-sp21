@@ -23,10 +23,12 @@ module Game.GameState
     getLegalMoveTo,
     getLegalMoveTo',
     getLegalBuildAt,
+    getLegalPushTo,
     createPlayerMap,
     createLevelMap,
     isWinningMove,
     hasWinningMove,
+    makeNextLevelMap,
   )
 where
 
@@ -36,7 +38,6 @@ import Data.Board (Board (Board), Level, Player (Player))
 import qualified Data.Board
 import qualified Data.BoardWithoutCard
 import Data.Card (Card (Apollo, Artemis, Atlas, Demeter, Hephastus, Minotaur, Pan, Prometheus))
-
 import Data.IntMap (IntMap, (!))
 import qualified Data.IntMap as Map
 import Data.List (find, foldl', sort, tails)
@@ -165,7 +166,7 @@ getLegalMoveTo :: Maybe Card -> Index -> PlayerMap -> Levels -> LevelMap -> [Ind
 -- to the original space.
 getLegalMoveTo (Just Artemis) mf pm lv lm =
   let firstMove = getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
-      secondMoveFrom = (if mf `elemBB` (lm ! 2) then (\x -> x `andNotBB` (lm ! 3)) else id) firstMove
+      secondMoveFrom = (if lv ! mf == 2 then (\x -> x `andNotBB` (lm ! 3)) else id) firstMove
    in bbToList $ foldl' (\z x -> z .|. getLegalMoveTo' x lv lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
 --
 -- [Minotaur]
@@ -174,7 +175,7 @@ getLegalMoveTo (Just Artemis) mf pm lv lm =
 -- the token would be able to move to the opponent’s space if the opponent token were not there.
 -- The unoccupied space where the opponent’s token is pushed can be at any level less than 4.
 getLegalMoveTo (Just Minotaur) mf pm lv lm =
-  let candidates = getLegalMoveTo' mf lv lm `andNotBB` (pm ! 4)
+  let candidates = getLegalMoveTo' mf lv lm `andNotBB` (if mf `elemBB` (pm ! 4) then pm ! 4 else pm ! 5)
       emptySpace = (lm ! 7) `andNotBB` (pm ! 6)
       isValidMoveTo mt = mt `elemBB` emptySpace || getPointSymmetricIndex mt mf `elemBB` emptySpace -- works only if mf and mt are adjacent
    in filter isValidMoveTo (bbToList candidates)
@@ -183,7 +184,7 @@ getLegalMoveTo (Just Minotaur) mf pm lv lm =
 -- A token’s move can optionally swap places with an adjacent opponent token,
 -- as long as the token would be able to move to the opponent’s space if the
 -- opponent token were not there; otherwise, the move must be to an unoccupied space as usual.
-getLegalMoveTo (Just Apollo) mf pm lv lm = bbToList $ getLegalMoveTo' mf lv lm `andNotBB` (pm ! 4)
+getLegalMoveTo (Just Apollo) mf pm lv lm = bbToList $ getLegalMoveTo' mf lv lm `andNotBB` (if mf `elemBB` (pm ! 4) then pm ! 4 else pm ! 5)
 --
 -- Others.
 getLegalMoveTo _ mf pm lv lm = bbToList $ getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
@@ -193,7 +194,9 @@ getLegalMoveTo _ mf pm lv lm = bbToList $ getLegalMoveTo' mf lv lm `andNotBB` (p
 --------------------------------------------------------------------------------
 getLegalPushTo :: Maybe Card -> Players -> Index -> Index -> Maybe (WorkerId, Index)
 getLegalPushTo (Just Apollo) [_, p] mf mt | mt `elem` p = Just (if p !! 0 == mt then 0 else 1, mf)
+getLegalPushTo (Just Apollo) [p, _] mf mt | mt `elem` p = Just (if p !! 0 == mt then 0 else 1, mf)
 getLegalPushTo (Just Minotaur) [_, p] mf mt | mt `elem` p = Just (if p !! 0 == mt then 0 else 1, getPointSymmetricIndex mt mf)
+getLegalPushTo (Just Minotaur) [p, _] mf mt | mt `elem` p = Just (if p !! 0 == mt then 0 else 1, getPointSymmetricIndex mt mf)
 getLegalPushTo _ _ _ _ = Nothing
 
 --------------------------------------------------------------------------------

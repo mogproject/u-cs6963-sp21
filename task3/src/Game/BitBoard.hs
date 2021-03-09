@@ -13,6 +13,7 @@ module Game.BitBoard
     countBB,
     getNeighborhood,
     getClosedNeighborhood,
+    getOpenNeighborhood,
     validIndices,
     isValidIndex,
     getPointSymmetricIndex,
@@ -61,7 +62,7 @@ showBB bb = unlines [concat [if posToIndex (r, c) `elemBB` bb then "*" else "-" 
 
 singletonBB :: Int -> BitBoard
 singletonBB i = 1 `shift` i
-{-# INLINABLE singletonBB #-}
+{-# INLINEABLE singletonBB #-}
 
 validIndices :: [Index]
 validIndices = [posToIndex (r, c) | r <- [1 .. 5], c <- [1 .. 5]]
@@ -90,11 +91,11 @@ listToBB = foldl' (\z x -> z .|. singletonBB x) 0
 
 elemBB :: Index -> BitBoard -> Bool
 elemBB i bb = (bb `shift` (- i)) .&. 1 == 1
-{-# INLINABLE elemBB #-}
+{-# INLINEABLE elemBB #-}
 
 andNotBB :: BitBoard -> BitBoard -> BitBoard
 andNotBB bb x = bb .&. complement x
-{-# INLINABLE andNotBB #-}
+{-# INLINEABLE andNotBB #-}
 
 isValidIndex :: Index -> Bool
 isValidIndex i = elemBB i globalMask
@@ -121,6 +122,10 @@ getClosedNeighborhood bb =
   let x = bb .|. (bb `shift` 1) .|. (bb `shift` (-1))
       y = x .|. (x `shift` 7) .|. (x `shift` (-7))
    in y .&. globalMask
+
+-- Can we inprove performance?
+getOpenNeighborhood :: BitBoard -> BitBoard
+getOpenNeighborhood bb = foldl' (\z i -> z .|. getNeighborhood i) 0 (bbToList bb)
 
 --------------------------------------------------------------------------------
 -- Pushing

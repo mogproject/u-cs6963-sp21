@@ -1,10 +1,10 @@
 module Game.GameStateSpec (spec) where
 
-import Data.Bits (Bits ((.&.), (.|.)))
+import Data.Bits (Bits ((.|.)))
 import Data.Board (readBoard)
 import qualified Data.Board as B
 import Data.Card
-import Data.IntMap (IntMap, (!))
+import Data.IntMap ((!))
 import qualified Data.IntMap as Map
 import Data.Maybe (fromMaybe)
 import Game.BitBoard

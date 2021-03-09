@@ -6,6 +6,11 @@
 $ stack test
 ```
 
+Run specific tests (example)
+
+```
+$ stack test --ta '-m Game.Evaluation'
+```
 
 ## Running Program
 

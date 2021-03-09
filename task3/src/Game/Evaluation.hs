@@ -8,13 +8,19 @@ module Game.Evaluation
     evaluateAsymmetry',
     evaluateStuckBonus',
     evaluatePrevention',
+    hasDoubleLizhi,
+    hasOneXiangting,
+    hasOneXiangtingPrometheus',
+    hasOneXiangtingMinotaur'',
+    hasOneXiangtingArtemis,
   )
 where
 
-import Data.Bits (complement, (.&.), (.|.))
-import Data.Card (Card (Apollo, Artemis, Minotaur, Pan, Prometheus))
+import Data.Bits (Bits (xor), complement, (.&.), (.|.))
+import Data.Card (Card (Apollo, Artemis, Demeter, Hephastus, Minotaur, Pan, Prometheus))
 import Data.IntMap (IntMap, (!))
 import qualified Data.IntMap as Map
+import Data.List (foldl')
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Vector.Unboxed as V
@@ -38,7 +44,7 @@ scoreWin :: Score
 scoreWin = 1000000000 -- 1e9
 
 evalProxTable :: V.Vector Score
-evalProxTable = V.fromList [0, 10000, 8000, 5000, 2000, 0]
+evalProxTable = V.fromList [0, 1000, 990, 50, 20, 0]
 
 evalProxTableSize :: Int
 evalProxTableSize = V.length evalProxTable
@@ -131,8 +137,12 @@ evalPrometeus312 = 40000
 evalPrometeus322 :: Score
 evalPrometeus322 = 70000
 
-evalPrometeus323 :: Score
-evalPrometeus323 = 100000
+evalDoubleLizhi :: Score
+evalDoubleLizhi = 10000000
+
+-- one step away from double lizhi
+evalOneXiangting :: Score
+evalOneXiangting = 1000000
 
 --------------------------------------------------------------------------------
 -- Distance Computation
@@ -195,6 +205,7 @@ evaluate
               evaluateAsymmetry pl lv lm bestDist,
               evaluateStuckBonus pl adj,
               evaluatePrevention pl lv lm bestDist,
+              evaluateDoubleLizhiBonus cs pl pm lv lm,
               evaluatePrometeusBonus cs pm lm
             ]
        in sign * sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
@@ -244,7 +255,309 @@ evaluatePrevention pl lv lm dist p = sum [f index | w <- [0, 1], let index = pl 
             then evalPreventionAdvantage
             else 0
 
--- (6) Prometeus Bonus
+-- (6) Double Lizhi Bonus
+evaluateDoubleLizhiBonus :: Cards -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Score
+evaluateDoubleLizhiBonus cs pl pm lv lm p
+  | hasDoubleLizhi (cs !! p) p pm lm = evalDoubleLizhi
+  | hasOneXiangting (cs !! p) p pl pm lv lm = evalOneXiangting
+  | otherwise = 0
+
+hasDoubleLizhi :: Maybe Card -> Int -> PlayerMap -> LevelMap -> Bool
+-- Minotaur
+hasDoubleLizhi (Just Minotaur) p pm lm =
+  let ours = pm ! (4 + p)
+      nbrs = getClosedNeighborhood (ours .&. (lm ! 2)) .&. (lm ! 3)
+      opponentNbrs = nbrs .&. (pm ! (5 - p))
+      emptyNbrs = nbrs `andNotBB` (pm ! 6)
+      emptyCnt = countBB emptyNbrs
+      pushableNbrCnt =
+        length $
+          filter
+            (\i -> (getPushBB ours (singletonBB i) .&. (lm ! 7) `andNotBB` (pm ! 6)) /= 0)
+            $ bbToList opponentNbrs
+   in emptyCnt >= 2 || emptyCnt + pushableNbrCnt >= 2
+-- Artemis
+hasDoubleLizhi (Just Artemis) p pm lm =
+  let lv2 = ((pm ! (4 + p)) .|. (getClosedNeighborhood (pm ! (4 + p) `andNotBB` (lm ! 0)) `andNotBB` (pm ! 6))) .&. (lm ! 2)
+   in countBB (getClosedNeighborhood lv2 .&. (lm ! 3) `andNotBB` (pm ! 6)) >= 2
+-- Pan
+hasDoubleLizhi (Just Pan) p pm lm =
+  let fromLv2 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 2)) `andNotBB` (pm ! 6)
+      fromLv3 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 3)) `andNotBB` (pm ! 6)
+   in countBB ((fromLv2 .&. ((lm ! 0) .|. (lm ! 3))) .|. (fromLv3 .&. (lm ! 5))) >= 2
+-- others
+hasDoubleLizhi _ p pm lm =
+  let emptyNbrs = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 2)) `andNotBB` (pm ! 6)
+   in countBB (emptyNbrs .&. (lm ! 3)) >= 2
+
+hasOneXiangting :: Maybe Card -> Int -> Players -> PlayerMap -> Levels -> LevelMap -> Bool
+-- Apollo
+hasOneXiangting c@(Just Apollo) p pl pm lv lm =
+  let ours = pm ! (4 + p)
+      moveFrom = ours `andNotBB` (lm ! 0)
+      moveTo = getClosedNeighborhood moveFrom .&. (lm ! 2) `andNotBB` (pm ! (4 + p)) .&. getClosedNeighborhood (lm ! 3)
+   in canCooperatePattern1 c pl pm lv lm p || any (canMakeLizhi c pm lm p) (bbToList moveTo)
+-- Artemis
+hasOneXiangting (Just Artemis) p pl pm lv lm = any (hasOneXiangtingArtemis p pl pm lv lm) [0, 1]
+-- Minotaur
+hasOneXiangting (Just Minotaur) p pl pm lv lm = any (hasOneXiangtingMinotaur p pl pm lv lm) [0, 1]
+-- Prometheus
+hasOneXiangting (Just Prometheus) p pl pm lv lm = any (hasOneXiangtingPrometheus p pl pm lv lm) [0, 1]
+-- Demeter
+hasOneXiangting c@(Just Demeter) p pl pm lv lm =
+  let ours = pm ! (4 + p)
+      moveFrom = ours `andNotBB` (lm ! 0)
+      moveTo = getClosedNeighborhood moveFrom .&. (lm ! 2) `andNotBB` (pm ! 6)
+   in canCooperatePattern1 c pl pm lv lm p || canCooperatePattern2 Demeter pl pm lv lm p || any (canMakeLizhi c pm lm p) (bbToList moveTo)
+-- Pan
+hasOneXiangting (Just Pan) p _ pm _ lm =
+  let ours = pm ! (4 + p)
+      oursLv2 = ours .&. (lm ! 2)
+      oursLv2Nbr = getClosedNeighborhood oursLv2
+      oursLv0 = ours .&. (lm ! 0)
+      oursLv3 = ours .&. (lm ! 3)
+      oursLv03 = oursLv0 .|. oursLv3
+      -- lv2 and lv0/3 workers are adjacent
+      considerCooperate = oursLv2Nbr .&. oursLv03 /= 0
+      oursLv03MoveTo =
+        ( (getClosedNeighborhood oursLv0 .&. (lm ! 5))
+            .|. (getClosedNeighborhood oursLv3 .&. (lm ! 7))
+        )
+          `andNotBB` (pm ! 6)
+      oursLv03TargetBuildAt = oursLv2Nbr .&. (lm ! 2) `andNotBB` (pm ! 6)
+      canCoorporate = considerCooperate && (getOpenNeighborhood oursLv03TargetBuildAt .&. oursLv03MoveTo) /= 0
+      opponent = pm ! (5 - p)
+      moveFrom = ours `andNotBB` (lm ! 0)
+      -- there's no path for Pan from lv 0 to lv 2
+      nextMoveCandidates = ((lm ! 0) `andNotBB` (pm ! 6)) .|. ((lm ! 3) `andNotBB` opponent)
+      moveTo = getClosedNeighborhood moveFrom .&. (lm ! 2) `andNotBB` (pm ! 6) .&. getClosedNeighborhood nextMoveCandidates
+   in canCoorporate || any (canMakeLizhi (Just Pan) pm lm p) (bbToList moveTo)
+-- Hephastus
+hasOneXiangting c@(Just Hephastus) p pl pm lv lm =
+  let ours = pm ! (4 + p)
+      moveFrom = ours `andNotBB` (lm ! 0)
+      moveTo = getClosedNeighborhood moveFrom .&. (lm ! 2) `andNotBB` (pm ! 6) .&. getClosedNeighborhood (lm ! 3)
+   in canCooperatePattern1 c pl pm lv lm p || any (canMakeLizhi c pm lm p) (bbToList moveTo)
+-- others
+hasOneXiangting c p pl pm lv lm =
+  let ours = pm ! (4 + p)
+      moveFrom = ours `andNotBB` (lm ! 0)
+      moveTo = getClosedNeighborhood moveFrom .&. (lm ! 2) `andNotBB` (pm ! 6) .&. getClosedNeighborhood (lm ! 3)
+   in canCooperatePattern1 c pl pm lv lm p || any (canMakeLizhi c pm lm p) (bbToList moveTo)
+
+-- Prometheus specific
+hasOneXiangtingPrometheus :: Int -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+hasOneXiangtingPrometheus p pl pm lv lm wk = hasOneXiangtingPrometheus' p pl pm lv lm wk || hasOneXiangtingPrometheus'' p pl pm lv lm wk
+
+-- help the other worker
+hasOneXiangtingPrometheus' :: Int -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+hasOneXiangtingPrometheus' p pl pm lv lm wk =
+  let waiter = pl !! p !! (1 - wk)
+      mf = pl !! p !! wk
+      mfl = lv ! mf
+      moveTo = getLegalMoveTo (Just Prometheus) mf pm lv lm
+      waiterNbr = getNeighborhood waiter `andNotBB` (pm ! (5 - p))
+      toBeBuiltLv1 = waiterNbr .&. (lm ! 1)
+      toBeBuiltLv2 = waiterNbr .&. (lm ! 2)
+      toBeBuiltLv3 = waiterNbr .&. (lm ! 3)
+   in (lv ! waiter) == 2
+        && any
+          ( \mt ->
+              let firstBuild
+                    | (lv ! mt) == mfl = getNeighborhood mf `andNotBB` singletonBB mt
+                    | (lv ! mt) < mfl = getNeighborhood mf
+                    | otherwise = 0
+                  secondBuild = getNeighborhood mt
+                  canBuild = firstBuild .|. secondBuild
+                  canBuildTwice = firstBuild .&. secondBuild
+               in ( (toBeBuiltLv3 /= 0 && ((toBeBuiltLv1 .&. canBuildTwice) .|. (toBeBuiltLv2 .&. canBuild)) /= 0)
+                      || (toBeBuiltLv2 .&. firstBuild /= 0 && toBeBuiltLv2 .&. secondBuild /= 0 && countBB (toBeBuiltLv2 .&. canBuild) >= 2)
+                  )
+          )
+          moveTo
+
+-- a worker moves consecutively
+hasOneXiangtingPrometheus'' :: Int -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+hasOneXiangtingPrometheus'' p pl pm lv lm wk =
+  let mf = pl !! p !! wk
+      mfl = lv ! mf
+      moveTo = getLegalMoveTo' mf lv lm .&. ((lm ! 1) .|. (lm ! 2)) `andNotBB` (pm ! 6)
+      firstBuild = getNeighborhood mf
+   in any
+        ( \mt ->
+            let mtl = lv ! mt
+             in if mtl == 1
+                  then -- mover raises the move-to level
+                    mfl >= 2 && canMakeLizhi Nothing pm (Map.insert mt 2 lm) p mt
+                  else
+                    canMakeLizhi Nothing pm lm p mt
+                      || ( mfl >= 2
+                             && let secondBuild = getNeighborhood mt
+                                    canBuild = firstBuild .|. secondBuild
+                                    canBuildTwice = firstBuild .&. secondBuild
+                                    targetNbr = getNeighborhood mt `andNotBB` (pm ! 6) -- exclude all workers, including mover
+                                    a1 = targetNbr .&. (lm ! 1)
+                                    a2 = targetNbr .&. (lm ! 2)
+                                    a3 = targetNbr .&. (lm ! 3)
+                                 in ( mfl == 2
+                                        && ( canBuild .&. a3 /= 0 -- no need of double build
+                                               || firstBuild .&. a2 /= 0 -- triangle of lv 2
+                                           )
+                                        || ( mfl == 3
+                                               && ( canBuildTwice .&. a1 /= 0 -- double build
+                                                      || a2 /= 0 -- lv2 exists
+                                                      || a3 /= 0 && targetNbr /= a3
+                                                  )
+                                           )
+                                    )
+                         )
+        )
+        (bbToList moveTo)
+
+-- Minotaur specific
+hasOneXiangtingMinotaur :: Int -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+hasOneXiangtingMinotaur p pl pm lv lm wk = hasOneXiangtingMinotaur' p pl pm lv lm wk || hasOneXiangtingMinotaur'' p pl pm lv lm wk
+
+-- help the other worker
+hasOneXiangtingMinotaur' :: Int -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+hasOneXiangtingMinotaur' p pl pm lv lm wk =
+  let waiter = pl !! p !! (1 - wk)
+      mf = pl !! p !! wk
+      mfl = lv ! mf
+      moveTo = listToBB $ getLegalMoveTo (Just Minotaur) mf pm lv lm
+      waiterNbrEmpty = getNeighborhood waiter .&. (lm ! 2) `andNotBB` (pm ! 6)
+   in (lv ! waiter) == 2 && mfl == 3 && getClosedNeighborhood moveTo .&. waiterNbrEmpty /= 0
+
+-- a worker moves consecutively
+hasOneXiangtingMinotaur'' :: Int -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+hasOneXiangtingMinotaur'' p pl pm lv lm wk =
+  let mf = pl !! p !! wk
+      moveTo = getLegalMoveTo (Just Minotaur) mf pm lv lm
+   in any
+        ( \mt ->
+            (lv ! mt) == 2 -- move-to must be level 2
+              && let pl' = case getLegalPushTo (Just Minotaur) pl mf mt of
+                       Just (wid, pushTo) -> [[if pp == p && wk == ww then mt else if pp /= p && wid == ww then pushTo else pl !! pp !! ww | ww <- [0, 1]] | pp <- [0, 1]]
+                       Nothing -> [[if pp == p && wk == ww then mt else pl !! pp !! ww | ww <- [0, 1]] | pp <- [0, 1]]
+                     pm' = createPlayerMap pl'
+                     buildAt = listToBB $ getLegalMoveTo (Just Minotaur) mt pm' lv lm
+                     buildAtLv3 = buildAt .&. (lm ! 3)
+                     buildAtEmpty = buildAt `andNotBB` (pm' ! 6)
+                     buildAtEmptyLv2 = buildAtEmpty .&. (lm ! 2)
+                     z3 = countBB buildAtLv3
+                     y2 = countBB buildAtEmptyLv2
+                     a = countBB buildAtEmpty -- must be >=1, one is move-from
+                  in (y2 >= 1 && z3 + y2 >= 2) || (z3 > 2) || (z3 == 2 && a > 2)
+        )
+        moveTo
+
+-- Artemis specific (maybe slow?)
+hasOneXiangtingArtemis :: Int -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+hasOneXiangtingArtemis p pl pm lv lm wk =
+  let mf = pl !! p !! wk
+      moveTo = getLegalMoveTo (Just Artemis) mf pm lv lm
+   in any
+        ( \mt ->
+            let -- update player map
+                pm' = foldl' (flip (Map.adjust (xor (listToBB [mf, mt])))) pm [2 * p + wk, 4 + p, 6]
+                buildAt = getNeighborhood mt .&. (lm ! 7) `andNotBB` (pm' ! 6)
+             in any
+                  ( \ba ->
+                      let -- update level map
+                          bal = lv ! ba
+                          lm' = makeNextLevelMap lm [(ba, bal, bal + 1)]
+                       in hasDoubleLizhi (Just Artemis) p pm' lm'
+                  )
+                  (bbToList buildAt)
+        )
+        moveTo
+
+-- Worker x is at level 3 (This happens rarely; opponent is Minotaur, or you are Minotaur and swapped by Apollo)
+-- Worker y adjacent to x is at level 2 and trying to win
+canCooperatePattern1 :: Maybe Card -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+canCooperatePattern1 (Just Apollo) pl pm lv lm p = canCooperatePattern1' (lm ! 2) (pm ! (4 + p)) pl pm lv lm p
+canCooperatePattern1 (Just Hephastus) pl pm lv lm p = canCooperatePattern1' ((lm ! 1) .|. (lm ! 2)) (pm ! 6) pl pm lv lm p
+canCooperatePattern1 _ pl pm lv lm p = canCooperatePattern1' (lm ! 2) (pm ! 6) pl pm lv lm p
+
+canCooperatePattern1' :: BitBoard -> BitBoard -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+canCooperatePattern1' targetLevels moveToMask pl pm lv lm p =
+  any
+    ( \wk ->
+        let moverPos = pl !! p !! wk
+            waiterPos = pl !! p !! (1 - wk)
+            waiterNbr = getNeighborhood waiterPos
+            toBeBuilt = waiterNbr .&. targetLevels `andNotBB` (pm ! 6)
+            canMoveTo = getLegalMoveTo' moverPos lv lm `andNotBB` moveToMask
+            result = getOpenNeighborhood toBeBuilt .&. canMoveTo /= 0 -- meet-in-the-middle
+         in (lv ! moverPos) == 3 && (lv ! waiterPos) == 2 && moverPos `elemBB` waiterNbr && result
+    )
+    [0, 1]
+
+-- Worker y at level 2 has two or more adjacent empty level-2 spaces.
+-- Worker x tries to move and build on top of those spaces.
+canCooperatePattern2 :: Card -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Bool
+canCooperatePattern2 Demeter pl pm lv lm p =
+  any
+    ( \wk ->
+        let moverPos = pl !! p !! wk
+            waiterPos = pl !! p !! (1 - wk)
+            canMoveTo = getLegalMoveTo (Just Demeter) moverPos pm lv lm
+            toBeBuilt = getNeighborhood waiterPos .&. (lm ! 2) `andNotBB` (pm ! (5 - p))
+         in (lv ! waiterPos) == 2
+              && any
+                ( \mt ->
+                    countBB (getNeighborhood mt .&. toBeBuilt) >= 2
+                )
+                canMoveTo
+    )
+    [0, 1]
+canCooperatePattern2 _ _ _ _ _ _ = undefined
+
+canMakeLizhi :: Maybe Card -> PlayerMap -> LevelMap -> Int -> Index -> Bool
+canMakeLizhi c pm lm p mt =
+  let ours = pm ! (4 + p)
+      opponent = pm ! (5 - p)
+      buildAt = getNeighborhood mt .&. (lm ! 7) `andNotBB` opponent
+      ba0 = buildAt .&. (lm ! 0)
+      ba1 = buildAt .&. (lm ! 1)
+      ba2 = buildAt .&. (lm ! 2)
+      ba3 = buildAt .&. (lm ! 3)
+      bx0 = ba0 .&. ours
+      bx1 = ba1 .&. ours
+      bx2 = ba2 .&. ours
+      bx3 = ba3 .&. ours
+      x0 = countBB bx0
+      x1 = countBB bx1
+      x2 = countBB bx2
+      x3 = countBB bx3
+      y0 = countBB $ ba0 `xor` bx0
+      y1 = countBB $ ba1 `xor` bx1
+      y2 = countBB $ ba2 `xor` bx2
+      y3 = countBB $ ba3 `xor` bx3
+   in canMakeLizhi' c (mt `elemBB` opponent) x0 x1 x2 x3 y0 y1 y2 y3
+
+canMakeLizhi' :: Maybe Card -> Bool -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Bool
+canMakeLizhi' (Just Apollo) True _ x1 x2 x3 y0 y1 y2 y3 =
+  (x1 >= 1 && y3 >= 1 && y2 + y3 >= 2) -- coming from lv 1
+    || (x2 >= 1 && y3 >= 1 && y2 + y3 >= 2) -- coming from lv 2
+    || (x3 >= 1 && (y2 >= 1 || (y3 >= 1 && y0 + y1 + y3 >= 2))) -- coming form lv3
+canMakeLizhi' (Just Demeter) _ _ x1 x2 x3 y0 y1 y2 y3 =
+  (x1 >= 1 && y2 + y3 >= 2) -- coming from lv 1
+    || (x2 >= 1 && y2 + y3 >= 1) -- coming from lv 2
+    || (x3 >= 1 && (y2 >= 1 || (y3 >= 1 && y0 + y1 + y3 >= 2))) -- coming form lv3
+canMakeLizhi' (Just Hephastus) _ _ x1 x2 x3 y0 y1 y2 y3 =
+  (x1 + x2 >= 1 && y3 >= 1) -- coming from lv 1 or 2
+    || (x3 >= 1 && (y1 + y2 >= 1 || (y3 >= 1 && y0 + y3 >= 2))) -- coming form lv3
+canMakeLizhi' (Just Pan) _ _ x1 x2 x3 y0 y1 y2 y3 =
+  (x1 >= 1 && y0 + y3 >= 1 && y0 + y2 + y3 >= 2) -- coming from lv 1
+    || (x2 >= 1 && y0 + y3 >= 1) -- coming from lv 2
+    || (x3 >= 1 && (y2 >= 1 || (y0 + y3 >= 1 && y0 + y1 + y3 >= 2))) -- coming form lv3
+canMakeLizhi' _ _ _ x1 x2 x3 y0 y1 y2 y3 =
+  (x1 >= 1 && y3 >= 1 && y2 + y3 >= 2) -- coming from lv 1
+    || (x2 >= 1 && y3 >= 1) -- coming from lv 2
+    || (x3 >= 1 && (y2 >= 1 || (y3 >= 1 && y0 + y1 + y3 >= 2))) -- coming form lv3
+
+-- (7) Prometeus Bonus
 evaluatePrometeusBonus :: Cards -> PlayerMap -> LevelMap -> Int -> Score
 evaluatePrometeusBonus cs pm lm p =
   if cs !! p == Just Prometheus
@@ -256,10 +569,7 @@ evaluatePrometeusBonus cs pm lm p =
             else
               if getClosedNeighborhood (lv3nbr .&. ((lm ! 1) .|. (lm ! 2))) .&. (lm ! 2) .&. (pm ! (4 + p)) /= 0
                 then evalPrometeus322 -- Pattern 3-(1or2)-*2
-                else
-                  if getClosedNeighborhood (lv3nbr .&. (pm ! (4 + p)) .&. (lm ! 2)) .&. (lm ! 3) `andNotBB` (pm ! 6) /= 0
-                    then evalPrometeus323 -- Pattern 3-*2-3
-                    else 0
+                else 0
     else 0
 
 --------------------------------------------------------------------------------
