@@ -158,16 +158,34 @@ createLevelMap lv =
 getLegalMoveTo' :: Index -> Levels -> LevelMap -> BitBoard
 getLegalMoveTo' mf lv lm = getNeighborhood mf .&. (lm ! min 7 ((lv ! mf) + 5))
 
+-- Bitboard-based legal move-to computation
+getLegalMoveTo'' :: LevelMap -> BitBoard -> (BitBoard, BitBoard, BitBoard, BitBoard) -> ((BitBoard, BitBoard, BitBoard, BitBoard), BitBoard)
+getLegalMoveTo'' lm forbidden (x0, x1, x2, x3) =
+  let cf = complement forbidden
+      y0 = getClosedNeighborhood (x0 .|. x1 .|. x2 .|. x3) .&. (lm ! 0) .&. cf
+      y1 = getClosedNeighborhood (x0 .|. x1 .|. x2 .|. x3) .&. (lm ! 1) .&. cf
+      y2 = getClosedNeighborhood (x1 .|. x2 .|. x3) .&. (lm ! 2) .&. cf
+      y3 = getClosedNeighborhood x3 .&. (lm ! 3) .&. cf
+      z = getClosedNeighborhood x2 .&. (lm ! 3) .&. cf
+   in ((y0, y1, y2, y3), z)
+
 getLegalMoveTo :: Maybe Card -> Index -> PlayerMap -> Levels -> LevelMap -> [Index]
 --
 -- [Artemis]
 -- The moved token can optionally move a second time (i.e., the same token),
 -- as long as the first move doesn’t win, and as long as the second move doesn’t return
 -- to the original space.
-getLegalMoveTo (Just Artemis) mf pm lv lm =
-  let firstMove = getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
-      secondMoveFrom = (if lv ! mf == 2 then (\x -> x `andNotBB` (lm ! 3)) else id) firstMove
-   in bbToList $ foldl' (\z x -> z .|. getLegalMoveTo' x lv lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
+
+-- getLegalMoveTo (Just Artemis) mf pm lv lm =
+--   let firstMove = getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
+--       secondMoveFrom = (if lv ! mf == 2 then (\x -> x `andNotBB` (lm ! 3)) else id) firstMove
+--    in bbToList $ foldl' (\z x -> z .|. getLegalMoveTo' x lv lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
+
+getLegalMoveTo (Just Artemis) mf pm _ lm =
+  let mfBB = singletonBB mf
+      (xs, a) = getLegalMoveTo'' lm (pm ! 6) (mfBB .&. (lm ! 0), mfBB .&. (lm ! 1), mfBB .&. (lm ! 2), mfBB .&. (lm ! 3))
+      ((y0, y1, y2, y3), b) = getLegalMoveTo'' lm (pm ! 6) xs
+   in bbToList $ y0 .|. y1 .|. y2 .|. y3 .|. a .|. b
 --
 -- [Minotaur]
 -- A token’s move can optionally enter the space of an opponent’s token,
