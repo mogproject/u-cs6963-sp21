@@ -117,7 +117,7 @@ $ scp yo-player cade:santorini/bin
 $ cd santorini
 $ mkdir log
 $ cd bin
-$ ./tournament --all-cards --rounds 5 ./play-rate ./yo-2021-03-06 > ../log/t-2021-03-06.log 2> ../log/t-2021-03-06.err
+$ ./tournament --all-cards --rounds 5 play-rate yo-2021-03-06 > ../log/t-2021-03-06.log 2> ../log/t-2021-03-06.err
 ```
 
 - Download an analyze results
