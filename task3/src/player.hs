@@ -38,7 +38,7 @@ mainLoop p@Params {seed = sd, timeout = to, depth = d} lineNo = do
 data Params = Params {help :: Bool, seed :: Maybe Int, timeout :: Maybe Int, depth :: Maybe Int}
 
 defaultParams :: Params
-defaultParams = Params {help = False, seed = Nothing, timeout = Just 10, depth = Nothing}
+defaultParams = Params {help = False, seed = Nothing, timeout = Just 30, depth = Nothing}
 
 parseArgs :: [String] -> Maybe Params -> Maybe Params
 parseArgs [] p = p

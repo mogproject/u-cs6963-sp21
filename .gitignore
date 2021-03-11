@@ -26,4 +26,5 @@ __pycache__/
 .vscode/
 task2/provided/
 task3/provided/
+task3/log/
 
