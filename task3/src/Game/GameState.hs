@@ -291,9 +291,8 @@ getLegalBuildAt (Just Prometheus) lv emptySpace mf mt
           x <- secondBuild
           let lvx = lv ! x
           doubleBuild <- [False, True]
-          if not doubleBuild
-            then return [(x, lvx, lvx + 1)]
-            else do
+          if doubleBuild
+            then do
               y <- firstBuild
               if x == y
                 then do
@@ -302,7 +301,7 @@ getLegalBuildAt (Just Prometheus) lv emptySpace mf mt
                 else do
                   let lvy = lv ! y
                   return [(x, lvx, lvx + 1), (y, lvy, lvy + 1)]
-
+            else return [(x, lvx, lvx + 1)]
 -- [ if x == y
 --     then [(x, lv ! x, (lv ! x) + 2)]
 --     else [(x, lv ! x, (lv ! x) + 1), (y, lv ! y, (lv ! y) + 1)]
