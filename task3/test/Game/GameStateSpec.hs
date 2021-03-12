@@ -24,11 +24,10 @@ getLegalMoveTo'' b =
         { cards = cs,
           players = pl,
           playerMap = pm,
-          levels = lv,
           levelMap = lm
         } = fromBoard b
 
-      f wk = getLegalMoveTo (cs !! 0) (pl !! 0 !! wk) pm lv lm
+      f wk = getLegalMoveTo (cs !! 0) (pl !! 0 !! wk) pm lm
    in [f wk | wk <- [0, 1]]
 
 -- b: board after a move
@@ -41,7 +40,7 @@ getLegalBuildAt' b wk moveFrom =
           levels = lv,
           levelMap = lm
         } = fromBoard b
-      emptySpace = ((lm ! 7) `andNotBB` (pm ! 6)) .|. singletonBB (pl !! 0 !! wk)
+      emptySpace = ((lm !! 7) `andNotBB` (pm ! 6)) .|. singletonBB (pl !! 0 !! wk)
       result = getLegalBuildAt (cs !! 0) lv emptySpace moveFrom (pl !! 0 !! wk)
    in [[(x, z) | (x, _, z) <- r] | r <- result]
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8fbf8c9d4b96594cbd6de1ca13e0816d89d6adbabeab09c006f8f805ef05246c
+-- hash: 38e25dcd28758dce8154cdd319389afef84556e51aebb8e69b0fab23dd12fdcf
 
 name:           santorini
 version:        0.1.0
@@ -29,14 +29,45 @@ library
       Paths_santorini
   hs-source-dirs:
       src
-  ghc-options: -Wall
+  ghc-options: -Wall -O2
   build-depends:
       QuickCheck
     , aeson
     , base ==4.*
     , containers
+    , criterion
     , hashtables
     , random
+    , split
+    , string-conversions
+    , vector
+  default-language: Haskell2010
+
+executable bench
+  main-is: bench.hs
+  other-modules:
+      Data.Board
+      Data.BoardWithoutCard
+      Data.Card
+      Game.BitBoard
+      Game.Evaluation
+      Game.GameMove
+      Game.GameState
+      Search.Initial
+      Search.Search
+      Paths_santorini
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -O2
+  build-depends:
+      QuickCheck
+    , aeson
+    , base ==4.*
+    , containers
+    , criterion
+    , hashtables
+    , random
+    , santorini
     , split
     , string-conversions
     , vector
@@ -57,12 +88,13 @@ executable santorini-player
       Paths_santorini
   hs-source-dirs:
       src
-  ghc-options: -Wall
+  ghc-options: -Wall -O2
   build-depends:
       QuickCheck
     , aeson
     , base ==4.*
     , containers
+    , criterion
     , hashtables
     , random
     , santorini
@@ -96,12 +128,13 @@ test-suite santorini-test
   hs-source-dirs:
       test
       test
-  ghc-options: -Wall
+  ghc-options: -Wall -O2
   build-depends:
       QuickCheck
     , aeson
     , base ==4.*
     , containers
+    , criterion
     , hashtables
     , hspec
     , random

@@ -131,3 +131,9 @@ $ source ./scripts/environment.sh
 $ $gu  < ./log/t-2021-03-06/128.log
 ```
 
+## Benchmarking
+
+```
+$ stack run bench -- --output log/bench.html
+$ open log/bench.html
+```

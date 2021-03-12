@@ -56,7 +56,7 @@ type Turn = Int
 
 type Levels = IntMap Level
 
-type LevelMap = IntMap BitBoard
+type LevelMap = [BitBoard]
 
 -- Internal representation of game states.
 data GameState = GameState
@@ -144,57 +144,85 @@ createPlayerMap pl =
    in Map.fromList $ zip [0 ..] (m ++ [v4, v5, v6])
 
 createLevelMap :: Levels -> LevelMap
+-- createLevelMap lv =
+--   let m' = Map.fromListWith (.|.) [(v, singletonBB k) | (k, v) <- Map.toList lv]
+--       m = Map.union m' (Map.fromList [(l, 0) | l <- [0 .. 4]])
+--       v5 = (m ! 0) .|. (m ! 1) -- level 0 or 1
+--       v6 = v5 .|. (m ! 2) -- level 0, 1 or 2
+--       v7 = v6 .|. (m ! 3) -- level 0, 1, 2 or 3
+--    in Map.insert 5 v5 $ Map.insert 6 v6 $ Map.insert 7 v7 m
+
 createLevelMap lv =
-  let m' = Map.fromListWith (.|.) [(v, singletonBB k) | (k, v) <- Map.toList lv]
-      m = Map.union m' (Map.fromList [(l, 0) | l <- [0 .. 4]])
-      v5 = (m ! 0) .|. (m ! 1) -- level 0 or 1
-      v6 = v5 .|. (m ! 2) -- level 0, 1 or 2
-      v7 = v6 .|. (m ! 3) -- level 0, 1, 2 or 3
-   in Map.insert 5 v5 $ Map.insert 6 v6 $ Map.insert 7 v7 m
+  let (v0, v1, v2, v3, v4) =
+        foldl'
+          ( \(x0, x1, x2, x3, x4) (i, y) ->
+              let bb = singletonBB i
+               in case y of
+                    0 -> (x0 + bb, x1, x2, x3, x4)
+                    1 -> (x0, x1 + bb, x2, x3, x4)
+                    2 -> (x0, x1, x2 + bb, x3, x4)
+                    3 -> (x0, x1, x2, x3 + bb, x4)
+                    _ -> (x0, x1, x2, x3, x4 + bb)
+          )
+          (0, 0, 0, 0, 0)
+          (Map.toList lv)
+      v5 = v0 + v1 -- level 0 or 1
+      v6 = v5 + v2 -- level 0, 1 or 2
+      v7 = v6 + v3 -- level 0, 1, 2 or 3
+   in [v0, v1, v2, v3, v4, v5, v6, v7]
 
 --------------------------------------------------------------------------------
 -- Move to
 --------------------------------------------------------------------------------
-getLegalMoveTo' :: Index -> Levels -> LevelMap -> BitBoard
-getLegalMoveTo' mf lv lm = getNeighborhood mf .&. (lm ! min 7 ((lv ! mf) + 5))
+getLegalMoveTo' :: Index -> [BitBoard] -> BitBoard
+getLegalMoveTo' mf lm = getNeighborhood mf .&. canMoveTo mf
+  where
+    canMoveTo i
+      | i `elemBB` (lm !! 0) = lm !! 5
+      | i `elemBB` (lm !! 1) = lm !! 6
+      | otherwise = lm !! 7
 
--- Bitboard-based legal move-to computation
-getLegalMoveTo'' :: LevelMap -> BitBoard -> (BitBoard, BitBoard, BitBoard, BitBoard) -> ((BitBoard, BitBoard, BitBoard, BitBoard), BitBoard)
-getLegalMoveTo'' lm forbidden (x0, x1, x2, x3) =
-  let cf = complement forbidden
-      y0 = getClosedNeighborhood (x0 .|. x1 .|. x2 .|. x3) .&. (lm ! 0) .&. cf
-      y1 = getClosedNeighborhood (x0 .|. x1 .|. x2 .|. x3) .&. (lm ! 1) .&. cf
-      y2 = getClosedNeighborhood (x1 .|. x2 .|. x3) .&. (lm ! 2) .&. cf
-      y3 = getClosedNeighborhood x3 .&. (lm ! 3) .&. cf
-      z = getClosedNeighborhood x2 .&. (lm ! 3) .&. cf
-   in ((y0, y1, y2, y3), z)
-
-getLegalMoveTo :: Maybe Card -> Index -> PlayerMap -> Levels -> LevelMap -> [Index]
+getLegalMoveTo :: Maybe Card -> Index -> PlayerMap -> LevelMap -> [Index]
 --
 -- [Artemis]
 -- The moved token can optionally move a second time (i.e., the same token),
 -- as long as the first move doesn’t win, and as long as the second move doesn’t return
 -- to the original space.
 
--- getLegalMoveTo (Just Artemis) mf pm lv lm =
---   let firstMove = getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
---       secondMoveFrom = (if lv ! mf == 2 then (\x -> x `andNotBB` (lm ! 3)) else id) firstMove
---    in bbToList $ foldl' (\z x -> z .|. getLegalMoveTo' x lv lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
-
-getLegalMoveTo (Just Artemis) mf pm _ lm =
-  let mfBB = singletonBB mf
-      (xs, a) = getLegalMoveTo'' lm (pm ! 6) (mfBB .&. (lm ! 0), mfBB .&. (lm ! 1), mfBB .&. (lm ! 2), mfBB .&. (lm ! 3))
-      ((y0, y1, y2, y3), b) = getLegalMoveTo'' lm (pm ! 6) xs
-   in bbToList $ y0 .|. y1 .|. y2 .|. y3 .|. a .|. b
+getLegalMoveTo (Just Artemis) mf pm lm =
+  let firstMove = getLegalMoveTo' mf lm `andNotBB` (pm ! 6)
+      secondMoveFrom = (if mf `elemBB` (lm !! 2) then (\x -> x `andNotBB` (lm !! 3)) else id) firstMove
+   in bbToList $ foldl' (\z x -> z .|. getLegalMoveTo' x lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
+--
+-- =========================================================================================
+--     Less efficient implementation
+-- =========================================================================================
+-- Bitboard-based legal move-to computation
+-- getLegalMoveTo'' :: LevelMap -> BitBoard -> (BitBoard, BitBoard, BitBoard, BitBoard) -> ((BitBoard, BitBoard, BitBoard, BitBoard), BitBoard)
+-- getLegalMoveTo'' lm forbidden (x0, x1, x2, x3) =
+--   let cf = complement forbidden
+--       y0 = getClosedNeighborhood (x0 .|. x1 .|. x2 .|. x3) .&. (lm !! 0) .&. cf
+--       y1 = getClosedNeighborhood (x0 .|. x1 .|. x2 .|. x3) .&. (lm !! 1) .&. cf
+--       y2 = getClosedNeighborhood (x1 .|. x2 .|. x3) .&. (lm !! 2) .&. cf
+--       y3 = getClosedNeighborhood x3 .&. (lm !! 3) .&. cf
+--       z = getClosedNeighborhood x2 .&. (lm !! 3) .&. cf
+--    in ((y0, y1, y2, y3), z)
+-- --
+-- getLegalMoveTo (Just Artemis) mf pm lm =
+--   let mfBB = singletonBB mf
+--       (xs, a) = getLegalMoveTo'' lm (pm ! 6) (mfBB .&. (lm !! 0), mfBB .&. (lm !! 1), mfBB .&. (lm !! 2), mfBB .&. (lm !! 3))
+--       ((y0, y1, y2, y3), b) = getLegalMoveTo'' lm (pm ! 6) xs
+--    in bbToList $ y0 .|. y1 .|. y2 .|. y3 .|. a .|. b
+-- =========================================================================================
 --
 -- [Minotaur]
 -- A token’s move can optionally enter the space of an opponent’s token,
 -- but only if the token can be pushed back to an unoccupied space, and only as long as
 -- the token would be able to move to the opponent’s space if the opponent token were not there.
 -- The unoccupied space where the opponent’s token is pushed can be at any level less than 4.
-getLegalMoveTo (Just Minotaur) mf pm lv lm =
-  let candidates = getLegalMoveTo' mf lv lm `andNotBB` (if mf `elemBB` (pm ! 4) then pm ! 4 else pm ! 5)
-      emptySpace = (lm ! 7) `andNotBB` (pm ! 6)
+getLegalMoveTo (Just Minotaur) mf pm lm =
+  let candidates = getLegalMoveTo' mf lm `andNotBB` (if mf `elemBB` (pm ! 4) then pm ! 4 else pm ! 5)
+      emptySpace = (lm !! 7) `andNotBB` (pm ! 6)
       isValidMoveTo mt = mt `elemBB` emptySpace || getPointSymmetricIndex mt mf `elemBB` emptySpace -- works only if mf and mt are adjacent
    in filter isValidMoveTo (bbToList candidates)
 --
@@ -202,10 +230,10 @@ getLegalMoveTo (Just Minotaur) mf pm lv lm =
 -- A token’s move can optionally swap places with an adjacent opponent token,
 -- as long as the token would be able to move to the opponent’s space if the
 -- opponent token were not there; otherwise, the move must be to an unoccupied space as usual.
-getLegalMoveTo (Just Apollo) mf pm lv lm = bbToList $ getLegalMoveTo' mf lv lm `andNotBB` (if mf `elemBB` (pm ! 4) then pm ! 4 else pm ! 5)
+getLegalMoveTo (Just Apollo) mf pm lm = bbToList $ getLegalMoveTo' mf lm `andNotBB` (if mf `elemBB` (pm ! 4) then pm ! 4 else pm ! 5)
 --
 -- Others.
-getLegalMoveTo _ mf pm lv lm = bbToList $ getLegalMoveTo' mf lv lm `andNotBB` (pm ! 6)
+getLegalMoveTo _ mf pm lm = bbToList $ getLegalMoveTo' mf lm `andNotBB` (pm ! 6)
 
 --------------------------------------------------------------------------------
 -- Push to
@@ -291,8 +319,8 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
         let mf = pl !! 0 !! wk -- move from
 
         -- move to
-        mt <- getLegalMoveTo c1 mf pm lv lm
-        let applyDoubleMove = if mt `elemBB` getLegalMoveTo' mf lv lm then id else setDoubleMove
+        mt <- getLegalMoveTo c1 mf pm lm
+        let applyDoubleMove = if mt `elemBB` getLegalMoveTo' mf lm then id else setDoubleMove
 
         -- push to
         let pushInfo = getLegalPushTo c1 pl mf mt
@@ -309,12 +337,12 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
 
         -- check winning
         -- Note: it's possible for Artemis to win by moving like 1->2->3 or 3->2->3
-        if isWinningMove c1 mf mt lv lm
+        if isWinningMove c1 mf mt lm
           then -- if there is a winning move, do not build (thus, do not generate all moves for Artemis)
             return $ setWin moveSofar
           else do
             -- build at
-            let emptySpace = ((lm ! 7) `andNotBB` (pm'' ! 6)) .|. singletonBB mt
+            let emptySpace = ((lm !! 7) `andNotBB` (pm'' ! 6)) .|. singletonBB mt
             bls <- getLegalBuildAt c1 lv emptySpace mf mt
 
             -- check next levels
@@ -347,44 +375,49 @@ getLegalMoves _ _ _ _ _ _ = undefined
 -- Checking Winning Moves
 --------------------------------------------------------------------------------
 
-isWinningMove :: Maybe Card -> Index -> Index -> Levels -> LevelMap -> Bool
+isWinningMove :: Maybe Card -> Index -> Index -> LevelMap -> Bool
 -- Artemis' move lv 3 -> lv 2 -> lv 3
-isWinningMove (Just Artemis) mf mt lv lm | (lv ! mt) == 3 && (lv ! mf) == 3 = getNeighborhood mf .&. getNeighborhood mt .&. (lm ! 2) /= 0
-isWinningMove (Just Pan) mf mt lv lm = (lv ! mt) + 2 <= (lv ! mf) || isWinningMove Nothing mf mt lv lm
-isWinningMove _ mf mt lv _ = (lv ! mt) == 3 && (lv ! mf) < 3
+isWinningMove (Just Artemis) mf mt lm
+  | mt `elemBB` (lm !! 3) && mf `elemBB` (lm !! 3) = getNeighborhood mf .&. getNeighborhood mt .&. (lm !! 2) /= 0
+isWinningMove (Just Pan) mf mt lm
+  | mf `elemBB` (lm !! 2) = mt `elemBB` ((lm !! 3) .|. (lm !! 0))
+  | mf `elemBB` (lm !! 3) = mt `elemBB` ((lm !! 0) .|. (lm !! 1))
+isWinningMove _ mf mt lm = mt `elemBB` (lm !! 3) && mf `elemBB` (lm !! 6)
 
 hasWinningMove :: Maybe Card -> Int -> PlayerMap -> LevelMap -> Bool
 -- Pan: ((N[P4 & L2] & (L0 & L3)) | (N[P4 & L3] & L5)) & ~P6
 hasWinningMove (Just Pan) p pm lm =
-  let fromLv2 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 2)) .&. ((lm ! 0) .|. (lm ! 3))
-      fromLv3 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 3)) .&. (lm ! 5)
+  let fromLv2 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm !! 2)) .&. ((lm !! 0) .|. (lm !! 3))
+      fromLv3 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm !! 3)) .&. (lm !! 5)
    in (fromLv2 .|. fromLv3) `andNotBB` (pm ! 6) /= 0
 -- Artemis: N[L3 & ~P6] & L2 & (P4 | (N[P4 & ~L0] & ~P6))
 hasWinningMove (Just Artemis) p pm lm =
-  let x = (pm ! (4 + p)) `andNotBB` (lm ! 0) -- Artemis workers at Lv 1, 2, or 3
-      a = getClosedNeighborhood ((lm ! 3) `andNotBB` (pm ! 6)) .&. (lm ! 2) -- Lv2 spaces next to empty Lv3
+  let x = (pm ! (4 + p)) `andNotBB` (lm !! 0) -- Artemis workers at Lv 1, 2, or 3
+      a = getClosedNeighborhood ((lm !! 3) `andNotBB` (pm ! 6)) .&. (lm !! 2) -- Lv2 spaces next to empty Lv3
       b = getClosedNeighborhood x `andNotBB` (pm ! 6) -- Artemis workers' empty neighbors
    in a .&. (x .|. b) /= 0
 -- Minotaur
 hasWinningMove (Just Minotaur) p pm lm =
-  let x = (pm ! (4 + p)) .&. (lm ! 2)
-      y = getClosedNeighborhood x .&. (lm ! 3) .&. (pm ! (5 - p))
+  let x = (pm ! (4 + p)) .&. (lm !! 2)
+      y = getClosedNeighborhood x .&. (lm !! 3) .&. (pm ! (5 - p))
       q = getPushBB x y
-   in hasWinningMove Nothing p pm lm || q .&. (lm ! 7) `andNotBB` (pm ! 6) /= 0
+   in hasWinningMove Nothing p pm lm || q .&. (lm !! 7) `andNotBB` (pm ! 6) /= 0
 -- Others: N[P4 & L2] & L3 & ~P6
 hasWinningMove _ p pm lm =
-  getClosedNeighborhood ((pm ! (4 + p)) .&. (lm ! 2)) .&. (lm ! 3) `andNotBB` (pm ! 6) /= 0
+  getClosedNeighborhood ((pm ! (4 + p)) .&. (lm !! 2)) .&. (lm !! 3) `andNotBB` (pm ! 6) /= 0
 
 isBlocking :: BitBoard -> PlayerMap -> LevelMap -> Bool
-isBlocking buildTo pmBefore lmBefore =
-  let fromLv0 = getClosedNeighborhood ((pmBefore ! 5) .&. (lmBefore ! 0)) .&. (lmBefore ! 1)
-      fromLv1 = getClosedNeighborhood ((pmBefore ! 5) .&. (lmBefore ! 1)) .&. (lmBefore ! 2)
+isBlocking buildTo pmBefore lm =
+  -- lm before
+  let fromLv0 = getClosedNeighborhood ((pmBefore ! 5) .&. (lm !! 0)) .&. (lm !! 1)
+      fromLv1 = getClosedNeighborhood ((pmBefore ! 5) .&. (lm !! 1)) .&. (lm !! 2)
    in buildTo .&. (fromLv0 .|. fromLv1) /= 0
 
 isStepping :: BitBoard -> PlayerMap -> LevelMap -> Bool
-isStepping buildTo pmAfter lmAfter =
-  let fromLv0 = getClosedNeighborhood ((pmAfter ! 4) .&. (lmAfter ! 0)) .&. (lmAfter ! 1)
-      fromLv1 = getClosedNeighborhood ((pmAfter ! 4) .&. (lmAfter ! 1)) .&. (lmAfter ! 2)
+isStepping buildTo pmAfter lm =
+  -- lm after
+  let fromLv0 = getClosedNeighborhood ((pmAfter ! 4) .&. (lm !! 0)) .&. (lm !! 1)
+      fromLv1 = getClosedNeighborhood ((pmAfter ! 4) .&. (lm !! 1)) .&. (lm !! 2)
    in buildTo .&. (fromLv0 .|. fromLv1) /= 0
 
 --------------------------------------------------------------------------------
@@ -405,19 +438,44 @@ makeNextLevels = foldl' (\xlv (bl, _, nextLevel) -> Map.insert bl nextLevel xlv)
 
 -- Note: Use strict foldl' for better performance.
 makeNextLevelMap :: LevelMap -> [(Index, Level, Level)] -> LevelMap
+-- makeNextLevelMap lm bls =
+--   let m =
+--         foldl'
+--           ( \xlm (bl, prevLevel, nextLevel) ->
+--               let x = singletonBB bl
+--                in Map.adjust (xor x) prevLevel $ Map.adjust (xor x) nextLevel xlm
+--           )
+--           lm
+--           bls
+--       v5 = (m ! 0) .|. (m ! 1) -- level 0 or 1
+--       v6 = v5 .|. (m ! 2) -- level 0, 1 or 2
+--       v7 = v6 .|. (m ! 3) -- level 0, 1, 2 or 3
+--    in Map.insert 5 v5 $ Map.insert 6 v6 $ Map.insert 7 v7 m
+
 makeNextLevelMap lm bls =
-  let m =
+  let (v0, v1, v2, v3, v4) =
         foldl'
-          ( \xlm (bl, prevLevel, nextLevel) ->
-              let x = singletonBB bl
-               in Map.adjust (xor x) prevLevel $ Map.adjust (xor x) nextLevel xlm
+          ( \(x0, x1, x2, x3, x4) (bl, prevLv, nextLv) ->
+              let bb = singletonBB bl
+               in case (prevLv, nextLv) of
+                    (0, 1) -> (x0 `xor` bb, x1 `xor` bb, x2, x3, x4)
+                    (0, 2) -> (x0 `xor` bb, x1, x2 `xor` bb, x3, x4)
+                    (0, 3) -> (x0 `xor` bb, x1, x2, x3 `xor` bb, x4)
+                    (0, _) -> (x0 `xor` bb, x1, x2, x3, x4 `xor` bb)
+                    (1, 2) -> (x0, x1 `xor` bb, x2 `xor` bb, x3, x4)
+                    (1, 3) -> (x0, x1 `xor` bb, x2, x3 `xor` bb, x4)
+                    (1, _) -> (x0, x1 `xor` bb, x2, x3, x4 `xor` bb)
+                    (2, 3) -> (x0, x1, x2 `xor` bb, x3 `xor` bb, x4)
+                    (2, _) -> (x0, x1, x2 `xor` bb, x3, x4 `xor` bb)
+                    _ -> (x0, x1, x2, x3 `xor` bb, x4 `xor` bb) -- 3 -> 4
           )
-          lm
+          (lm !! 0, lm !! 1, lm !! 2, lm !! 3, lm !! 4)
           bls
-      v5 = (m ! 0) .|. (m ! 1) -- level 0 or 1
-      v6 = v5 .|. (m ! 2) -- level 0, 1 or 2
-      v7 = v6 .|. (m ! 3) -- level 0, 1, 2 or 3
-   in Map.insert 5 v5 $ Map.insert 6 v6 $ Map.insert 7 v7 m
+
+      v5 = v0 + v1 -- level 0 or 1
+      v6 = v5 + v2 -- level 0, 1 or 2
+      v7 = v6 + v3 -- level 0, 1, 2 or 3
+   in [v0, v1, v2, v3, v4, v5, v6, v7]
 
 makeMove :: GameState -> GameMove -> GameState
 makeMove

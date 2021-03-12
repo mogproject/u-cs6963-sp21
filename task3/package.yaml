@@ -5,7 +5,7 @@ copyright: (c) 2021 Yosuke Mizutani
 author: Yosuke Mizutani <yos@cs.utah.edu>
 maintainer: Yosuke Mizutani <yos@cs.utah.edu>
 
-ghc-options: -Wall
+ghc-options: -Wall -O2
 
 dependencies:
   - base == 4.*
@@ -17,6 +17,7 @@ dependencies:
   - vector
   - hashtables
   - QuickCheck
+  - criterion
 
 library:
   source-dirs: src
@@ -24,6 +25,11 @@ library:
 executables:
   santorini-player:
     main: player.hs
+    source-dirs: [src]
+    dependencies: [santorini]
+
+  bench:
+    main: bench.hs
     source-dirs: [src]
     dependencies: [santorini]
 

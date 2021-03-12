@@ -4,5 +4,7 @@ cradle:
       component: "santorini:lib"
     - path: "src/"
       component: "santorini:exe:santorini-player"
+    - path: "src/"
+      component: "santorini:exe:bench"
     - path: "test/"
       component: "santorini:test:santorini-test"

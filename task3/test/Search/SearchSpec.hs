@@ -6,7 +6,7 @@ import Data.Card
 import Data.Map (Map)
 import qualified Data.Map
 import Data.Maybe (fromMaybe)
-import Game.BitBoard
+import Game.BitBoard ( posToIndex )
 import Game.Evaluation
 import Game.GameMove
 import Game.GameState (GameState (legalMoves), fromBoard, makeMove)
