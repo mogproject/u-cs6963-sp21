@@ -436,46 +436,142 @@ makeNextPlayers _ _ = undefined
 makeNextLevels :: Levels -> [(Index, Level, Level)] -> Levels
 makeNextLevels = foldl' (\xlv (bl, _, nextLevel) -> Map.insert bl nextLevel xlv)
 
--- Note: Use strict foldl' for better performance.
 makeNextLevelMap :: LevelMap -> [(Index, Level, Level)] -> LevelMap
+-- Note: These definitions are tedious yet more performant.
+makeNextLevelMap lm [] = lm
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 0, 1)] =
+  let bb1 = singletonBB bl1
+   in [x0 `xor` bb1, x1 `xor` bb1, x2, x3, x4, x5, x6, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 0, 2)] =
+  let bb1 = singletonBB bl1
+   in [x0 `xor` bb1, x1, x2 `xor` bb1, x3, x4, x5 `xor` bb1, x6, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 0, 4)] =
+  let bb1 = singletonBB bl1
+   in [x0 `xor` bb1, x1, x2, x3, x4 `xor` bb1, x5 `xor` bb1, x6 `xor` bb1, x7 `xor` bb1]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 1, 2)] =
+  let bb1 = singletonBB bl1
+   in [x0, x1 `xor` bb1, x2 `xor` bb1, x3, x4, x5 `xor` bb1, x6, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 1, 3)] =
+  let bb1 = singletonBB bl1
+   in [x0, x1 `xor` bb1, x2, x3 `xor` bb1, x4, x5 `xor` bb1, x6 `xor` bb1, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 1, 4)] =
+  let bb1 = singletonBB bl1
+   in [x0, x1 `xor` bb1, x2, x3, x4 `xor` bb1, x5 `xor` bb1, x6 `xor` bb1, x7 `xor` bb1]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 2, 3)] =
+  let bb1 = singletonBB bl1
+   in [x0, x1, x2 `xor` bb1, x3 `xor` bb1, x4, x5, x6 `xor` bb1, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 2, 4)] =
+  let bb1 = singletonBB bl1
+   in [x0, x1, x2 `xor` bb1, x3, x4 `xor` bb1, x5, x6 `xor` bb1, x7 `xor` bb1]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 3, 4)] =
+  let bb1 = singletonBB bl1
+   in [x0, x1, x2, x3 `xor` bb1, x4 `xor` bb1, x5, x6, x7 `xor` bb1]
+-- double build
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 0, 1), (bl2, 0, 1)] =
+  let bb = singletonBB bl1 `xor` singletonBB bl2
+   in [x0 `xor` bb, x1 `xor` bb, x2, x3, x4, x5, x6, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 0, 1), (bl2, 1, 2)] =
+  let bb1 = singletonBB bl1
+      bb2 = singletonBB bl2
+      bb = bb1 `xor` bb2
+   in [x0 `xor` bb1, x1 `xor` bb, x2 `xor` bb2, x3, x4, x5 `xor` bb2, x6, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 0, 1), (bl2, 2, 3)] =
+  let bb1 = singletonBB bl1
+      bb2 = singletonBB bl2
+   in [x0 `xor` bb1, x1 `xor` bb1, x2 `xor` bb2, x3 `xor` bb2, x4, x5, x6 `xor` bb2, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 0, 1), (bl2, 3, 4)] =
+  let bb1 = singletonBB bl1
+      bb2 = singletonBB bl2
+   in [x0 `xor` bb1, x1 `xor` bb1, x2, x3 `xor` bb2, x4 `xor` bb2, x5, x6, x7 `xor` bb2]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 1, 2), (bl2, 0, 1)] =
+  let bb1 = singletonBB bl2
+      bb2 = singletonBB bl1
+      bb = bb1 `xor` bb2
+   in [x0 `xor` bb1, x1 `xor` bb, x2 `xor` bb2, x3, x4, x5 `xor` bb2, x6, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 1, 2), (bl2, 1, 2)] =
+  let bb = singletonBB bl1 `xor` singletonBB bl2
+   in [x0, x1 `xor` bb, x2 `xor` bb, x3, x4, x5 `xor` bb, x6, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 1, 2), (bl2, 2, 3)] =
+  let bb1 = singletonBB bl1
+      bb2 = singletonBB bl2
+      bb = bb1 `xor` bb2
+   in [x0, x1 `xor` bb1, x2 `xor` bb, x3 `xor` bb2, x4, x5 `xor` bb1, x6 `xor` bb2, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 1, 2), (bl2, 3, 4)] =
+  let bb1 = singletonBB bl1
+      bb2 = singletonBB bl2
+   in [x0, x1 `xor` bb1, x2 `xor` bb1, x3 `xor` bb2, x4 `xor` bb2, x5 `xor` bb1, x6, x7 `xor` bb2]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 2, 3), (bl2, 0, 1)] =
+  let bb1 = singletonBB bl2
+      bb2 = singletonBB bl1
+   in [x0 `xor` bb1, x1 `xor` bb1, x2 `xor` bb2, x3 `xor` bb2, x4, x5, x6 `xor` bb2, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 2, 3), (bl2, 1, 2)] =
+  let bb1 = singletonBB bl2
+      bb2 = singletonBB bl1
+      bb = bb1 `xor` bb2
+   in [x0, x1 `xor` bb1, x2 `xor` bb, x3 `xor` bb2, x4, x5 `xor` bb1, x6 `xor` bb2, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 2, 3), (bl2, 2, 3)] =
+  let bb = singletonBB bl1 `xor` singletonBB bl2
+   in [x0, x1, x2 `xor` bb, x3 `xor` bb, x4, x5, x6 `xor` bb, x7]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 2, 3), (bl2, 3, 4)] =
+  let bb1 = singletonBB bl1
+      bb2 = singletonBB bl2
+      bb = bb1 `xor` bb2
+   in [x0, x1, x2 `xor` bb1, x3 `xor` bb, x4 `xor` bb2, x5, x6 `xor` bb1, x7 `xor` bb2]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 3, 4), (bl2, 0, 1)] =
+  let bb1 = singletonBB bl2
+      bb2 = singletonBB bl1
+   in [x0 `xor` bb1, x1 `xor` bb1, x2, x3 `xor` bb2, x4 `xor` bb2, x5, x6, x7 `xor` bb2]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 3, 4), (bl2, 1, 2)] =
+  let bb1 = singletonBB bl2
+      bb2 = singletonBB bl1
+   in [x0, x1 `xor` bb1, x2 `xor` bb1, x3 `xor` bb2, x4 `xor` bb2, x5 `xor` bb1, x6, x7 `xor` bb2]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 3, 4), (bl2, 2, 3)] =
+  let bb1 = singletonBB bl2
+      bb2 = singletonBB bl1
+      bb = bb1 `xor` bb2
+   in [x0, x1, x2 `xor` bb1, x3 `xor` bb, x4 `xor` bb2, x5, x6 `xor` bb1, x7 `xor` bb2]
+makeNextLevelMap [x0, x1, x2, x3, x4, x5, x6, x7] [(bl1, 3, 4), (bl2, 3, 4)] =
+  let bb = singletonBB bl1 `xor` singletonBB bl2
+   in [x0, x1, x2, x3 `xor` bb, x4 `xor` bb, x5, x6, x7 `xor` bb]
+makeNextLevelMap _ _ = undefined
+
 -- makeNextLevelMap lm bls =
---   let m =
+--   let (v0, v1, v2, v3, v4) =
 --         foldl'
---           ( \xlm (bl, prevLevel, nextLevel) ->
---               let x = singletonBB bl
---                in Map.adjust (xor x) prevLevel $ Map.adjust (xor x) nextLevel xlm
+--           ( \(x0, x1, x2, x3, x4) (bl, prevLv, nextLv) ->
+--               let bb = singletonBB bl
+--                in --  in case prevLv of
+--                   -- 0 -> case nextLv of
+--                   --   1 -> (x0 `xor` bb, x1 `xor` bb, x2, x3, x4)
+--                   --   2 -> (x0 `xor` bb, x1, x2 `xor` bb, x3, x4)
+--                   --   3 -> (x0 `xor` bb, x1, x2, x3 `xor` bb, x4)
+--                   --   _ -> (x0 `xor` bb, x1, x2, x3, x4 `xor` bb)
+--                   -- 1 -> case nextLv of
+--                   --   2 -> (x0, x1 `xor` bb, x2 `xor` bb, x3, x4)
+--                   --   3 -> (x0, x1 `xor` bb, x2, x3 `xor` bb, x4)
+--                   --   _ -> (x0, x1 `xor` bb, x2, x3, x4 `xor` bb)
+--                   -- 2 -> case nextLv of
+--                   --   3 -> (x0, x1, x2 `xor` bb, x3 `xor` bb, x4)
+--                   --   _ -> (x0, x1, x2 `xor` bb, x3, x4 `xor` bb)
+--                   -- _ -> (x0, x1, x2, x3 `xor` bb, x4 `xor` bb)
+--                   case (prevLv, nextLv) of
+--                     (0, 1) -> (x0 `xor` bb, x1 `xor` bb, x2, x3, x4)
+--                     (0, 2) -> (x0 `xor` bb, x1, x2 `xor` bb, x3, x4)
+--                     (0, 3) -> (x0 `xor` bb, x1, x2, x3 `xor` bb, x4)
+--                     (0, _) -> (x0 `xor` bb, x1, x2, x3, x4 `xor` bb)
+--                     (1, 2) -> (x0, x1 `xor` bb, x2 `xor` bb, x3, x4)
+--                     (1, 3) -> (x0, x1 `xor` bb, x2, x3 `xor` bb, x4)
+--                     (1, _) -> (x0, x1 `xor` bb, x2, x3, x4 `xor` bb)
+--                     (2, 3) -> (x0, x1, x2 `xor` bb, x3 `xor` bb, x4)
+--                     (2, _) -> (x0, x1, x2 `xor` bb, x3, x4 `xor` bb)
+--                     _ -> (x0, x1, x2, x3 `xor` bb, x4 `xor` bb) -- 3 -> 4
 --           )
---           lm
+--           (lm !! 0, lm !! 1, lm !! 2, lm !! 3, lm !! 4)
 --           bls
---       v5 = (m ! 0) .|. (m ! 1) -- level 0 or 1
---       v6 = v5 .|. (m ! 2) -- level 0, 1 or 2
---       v7 = v6 .|. (m ! 3) -- level 0, 1, 2 or 3
---    in Map.insert 5 v5 $ Map.insert 6 v6 $ Map.insert 7 v7 m
-
-makeNextLevelMap lm bls =
-  let (v0, v1, v2, v3, v4) =
-        foldl'
-          ( \(x0, x1, x2, x3, x4) (bl, prevLv, nextLv) ->
-              let bb = singletonBB bl
-               in case (prevLv, nextLv) of
-                    (0, 1) -> (x0 `xor` bb, x1 `xor` bb, x2, x3, x4)
-                    (0, 2) -> (x0 `xor` bb, x1, x2 `xor` bb, x3, x4)
-                    (0, 3) -> (x0 `xor` bb, x1, x2, x3 `xor` bb, x4)
-                    (0, _) -> (x0 `xor` bb, x1, x2, x3, x4 `xor` bb)
-                    (1, 2) -> (x0, x1 `xor` bb, x2 `xor` bb, x3, x4)
-                    (1, 3) -> (x0, x1 `xor` bb, x2, x3 `xor` bb, x4)
-                    (1, _) -> (x0, x1 `xor` bb, x2, x3, x4 `xor` bb)
-                    (2, 3) -> (x0, x1, x2 `xor` bb, x3 `xor` bb, x4)
-                    (2, _) -> (x0, x1, x2 `xor` bb, x3, x4 `xor` bb)
-                    _ -> (x0, x1, x2, x3 `xor` bb, x4 `xor` bb) -- 3 -> 4
-          )
-          (lm !! 0, lm !! 1, lm !! 2, lm !! 3, lm !! 4)
-          bls
-
-      v5 = v0 + v1 -- level 0 or 1
-      v6 = v5 + v2 -- level 0, 1 or 2
-      v7 = v6 + v3 -- level 0, 1, 2 or 3
-   in [v0, v1, v2, v3, v4, v5, v6, v7]
+--       v5 = v0 + v1 -- level 0 or 1
+--       v6 = v5 + v2 -- level 0, 1 or 2
+--       v7 = v6 + v3 -- level 0, 1, 2 or 3
+--    in [v0, v1, v2, v3, v4, v5, v6, v7]
 
 makeMove :: GameState -> GameMove -> GameState
 makeMove

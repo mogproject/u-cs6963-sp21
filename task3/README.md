@@ -28,7 +28,6 @@ $ scripts/play.sh 1
 
 ```
 $ stack build --profile
-$ source ./scripts/environ.sh
 $ ./scripts/wrapper.sh < ./scripts/test_input.txt
 ```
 
