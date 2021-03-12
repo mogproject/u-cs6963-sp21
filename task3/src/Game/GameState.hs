@@ -287,12 +287,30 @@ getLegalBuildAt (Just Prometheus) lv emptySpace mf mt
     let secondBuild = bbToList $ getNeighborhood mt .&. emptySpace
         forbidden = if (lv ! mf) == (lv ! mt) then complement (1 `shift` mt) else -1
         firstBuild = bbToList $ getNeighborhood mf .&. emptySpace .&. forbidden
-     in getLegalBuildAt Nothing lv emptySpace mf mt
-          ++ [ if x == y then [(x, lv ! x, (lv ! x) + 2)] else [(x, lv ! x, (lv ! x) + 1), (y, lv ! y, (lv ! y) + 1)]
-               | x <- secondBuild,
-                 y <- firstBuild,
-                 x /= y || lv ! x <= 2
-             ]
+     in do
+          x <- secondBuild
+          let lvx = lv ! x
+          doubleBuild <- [False, True]
+          if not doubleBuild
+            then return [(x, lvx, lvx + 1)]
+            else do
+              y <- firstBuild
+              if x == y
+                then do
+                  guard $ lvx <= 2
+                  return [(x, lvx, lvx + 2)]
+                else do
+                  let lvy = lv ! y
+                  return [(x, lvx, lvx + 1), (y, lvy, lvy + 1)]
+
+-- [ if x == y
+--     then [(x, lv ! x, (lv ! x) + 2)]
+--     else [(x, lv ! x, (lv ! x) + 1), (y, lv ! y, (lv ! y) + 1)]
+--   | x <- secondBuild,
+--     y <- firstBuild,
+--     x /= y || lv ! x <= 2
+-- ]
+--   ++ (getLegalBuildAt Nothing lv emptySpace mf mt)
 --
 -- Others.
 getLegalBuildAt _ lv emptySpace _ mt = [[(bl, lv ! bl, (lv ! bl) + 1)] | bl <- bbToList $ getNeighborhood mt .&. emptySpace]

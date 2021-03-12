@@ -6,6 +6,7 @@ import qualified Data.Board as B
 import Data.Card
 import Data.IntMap ((!))
 import qualified Data.IntMap as Map
+import Data.List (sort)
 import Data.Maybe (fromMaybe)
 import Game.BitBoard
 import Game.GameState
@@ -310,26 +311,27 @@ spec = do
                 B.turn = 0
               }
 
-      getLegalBuildAt' b1 0 (ri 3 3)
-        `shouldBe` [ [(ri 1 3, 2)],
-                     [(ri 1 4, 1)],
-                     [(ri 1 5, 3)],
-                     [(ri 2 3, 3)],
-                     [(ri 3 3, 3)],
-                     [(ri 3 5, 4)],
-                     [(ri 1 3, 2), (ri 2 2, 2)],
-                     [(ri 1 3, 2), (ri 2 3, 3)],
-                     [(ri 1 4, 1), (ri 2 2, 2)],
-                     [(ri 1 4, 1), (ri 2 3, 3)],
-                     [(ri 1 5, 3), (ri 2 2, 2)],
-                     [(ri 1 5, 3), (ri 2 3, 3)],
-                     [(ri 2 3, 3), (ri 2 2, 2)],
-                     [(ri 2 3, 4)],
-                     [(ri 3 3, 3), (ri 2 2, 2)],
-                     [(ri 3 3, 3), (ri 2 3, 3)],
-                     [(ri 3 5, 4), (ri 2 2, 2)],
-                     [(ri 3 5, 4), (ri 2 3, 3)]
-                   ]
+      (sort . map sort) (getLegalBuildAt' b1 0 (ri 3 3))
+        `shouldBe` (sort . map sort)
+          [ [(ri 1 3, 2)],
+            [(ri 1 4, 1)],
+            [(ri 1 5, 3)],
+            [(ri 2 3, 3)],
+            [(ri 3 3, 3)],
+            [(ri 3 5, 4)],
+            [(ri 1 3, 2), (ri 2 2, 2)],
+            [(ri 1 3, 2), (ri 2 3, 3)],
+            [(ri 1 4, 1), (ri 2 2, 2)],
+            [(ri 1 4, 1), (ri 2 3, 3)],
+            [(ri 1 5, 3), (ri 2 2, 2)],
+            [(ri 1 5, 3), (ri 2 3, 3)],
+            [(ri 2 3, 3), (ri 2 2, 2)],
+            [(ri 2 3, 4)],
+            [(ri 3 3, 3), (ri 2 2, 2)],
+            [(ri 3 3, 3), (ri 2 3, 3)],
+            [(ri 3 5, 4), (ri 2 2, 2)],
+            [(ri 3 5, 4), (ri 2 3, 3)]
+          ]
 
       let b2 =
             B.Board
@@ -347,7 +349,7 @@ spec = do
                 B.turn = 0
               }
 
-      getLegalBuildAt' b2 0 (ri 3 3)
+      sort (getLegalBuildAt' b2 0 (ri 3 3))
         `shouldBe` [ [(ri 1 3, 2)],
                      [(ri 1 4, 1)],
                      [(ri 1 5, 3)],
@@ -372,32 +374,33 @@ spec = do
                 B.turn = 0
               }
 
-      getLegalBuildAt' b3 0 (ri 3 3)
-        `shouldBe` [ [(ri 1 3, 2)],
-                     [(ri 1 4, 1)],
-                     [(ri 1 5, 3)],
-                     [(ri 2 3, 3)],
-                     [(ri 3 3, 3)],
-                     [(ri 3 5, 4)],
-                     [(ri 1 3, 2), (ri 2 2, 2)],
-                     [(ri 1 3, 2), (ri 2 3, 3)],
-                     [(ri 1 3, 2), (ri 2 4, 2)],
-                     [(ri 1 4, 1), (ri 2 2, 2)],
-                     [(ri 1 4, 1), (ri 2 3, 3)],
-                     [(ri 1 4, 1), (ri 2 4, 2)],
-                     [(ri 1 5, 3), (ri 2 2, 2)],
-                     [(ri 1 5, 3), (ri 2 3, 3)],
-                     [(ri 1 5, 3), (ri 2 4, 2)],
-                     [(ri 2 3, 3), (ri 2 2, 2)],
-                     [(ri 2 3, 4)],
-                     [(ri 2 3, 3), (ri 2 4, 2)],
-                     [(ri 3 3, 3), (ri 2 2, 2)],
-                     [(ri 3 3, 3), (ri 2 3, 3)],
-                     [(ri 3 3, 3), (ri 2 4, 2)],
-                     [(ri 3 5, 4), (ri 2 2, 2)],
-                     [(ri 3 5, 4), (ri 2 3, 3)],
-                     [(ri 3 5, 4), (ri 2 4, 2)]
-                   ]
+      (sort . map sort) (getLegalBuildAt' b3 0 (ri 3 3))
+        `shouldBe` (sort . map sort)
+          [ [(ri 1 3, 2)],
+            [(ri 1 4, 1)],
+            [(ri 1 5, 3)],
+            [(ri 2 3, 3)],
+            [(ri 3 3, 3)],
+            [(ri 3 5, 4)],
+            [(ri 1 3, 2), (ri 2 2, 2)],
+            [(ri 1 3, 2), (ri 2 3, 3)],
+            [(ri 1 3, 2), (ri 2 4, 2)],
+            [(ri 1 4, 1), (ri 2 2, 2)],
+            [(ri 1 4, 1), (ri 2 3, 3)],
+            [(ri 1 4, 1), (ri 2 4, 2)],
+            [(ri 1 5, 3), (ri 2 2, 2)],
+            [(ri 1 5, 3), (ri 2 3, 3)],
+            [(ri 1 5, 3), (ri 2 4, 2)],
+            [(ri 2 3, 3), (ri 2 2, 2)],
+            [(ri 2 3, 4)],
+            [(ri 2 3, 3), (ri 2 4, 2)],
+            [(ri 3 3, 3), (ri 2 2, 2)],
+            [(ri 3 3, 3), (ri 2 3, 3)],
+            [(ri 3 3, 3), (ri 2 4, 2)],
+            [(ri 3 5, 4), (ri 2 2, 2)],
+            [(ri 3 5, 4), (ri 2 3, 3)],
+            [(ri 3 5, 4), (ri 2 4, 2)]
+          ]
 
       let b4 =
             B.Board
@@ -415,25 +418,26 @@ spec = do
                 B.turn = 0
               }
 
-      getLegalBuildAt' b4 0 (ri 3 3)
-        `shouldBe` [ [(ri 1 3, 2)],
-                     [(ri 1 4, 1)],
-                     [(ri 1 5, 3)],
-                     [(ri 2 3, 4)],
-                     [(ri 3 3, 3)],
-                     [(ri 3 5, 4)],
-                     [(ri 1 3, 2), (ri 2 2, 2)],
-                     [(ri 1 3, 2), (ri 2 3, 4)],
-                     [(ri 1 4, 1), (ri 2 2, 2)],
-                     [(ri 1 4, 1), (ri 2 3, 4)],
-                     [(ri 1 5, 3), (ri 2 2, 2)],
-                     [(ri 1 5, 3), (ri 2 3, 4)],
-                     [(ri 2 3, 4), (ri 2 2, 2)],
-                     [(ri 3 3, 3), (ri 2 2, 2)],
-                     [(ri 3 3, 3), (ri 2 3, 4)],
-                     [(ri 3 5, 4), (ri 2 2, 2)],
-                     [(ri 3 5, 4), (ri 2 3, 4)]
-                   ]
+      (sort . map sort) (getLegalBuildAt' b4 0 (ri 3 3))
+        `shouldBe` (sort . map sort)
+          [ [(ri 1 3, 2)],
+            [(ri 1 4, 1)],
+            [(ri 1 5, 3)],
+            [(ri 2 3, 4)],
+            [(ri 3 3, 3)],
+            [(ri 3 5, 4)],
+            [(ri 1 3, 2), (ri 2 2, 2)],
+            [(ri 1 3, 2), (ri 2 3, 4)],
+            [(ri 1 4, 1), (ri 2 2, 2)],
+            [(ri 1 4, 1), (ri 2 3, 4)],
+            [(ri 1 5, 3), (ri 2 2, 2)],
+            [(ri 1 5, 3), (ri 2 3, 4)],
+            [(ri 2 3, 4), (ri 2 2, 2)],
+            [(ri 3 3, 3), (ri 2 2, 2)],
+            [(ri 3 3, 3), (ri 2 3, 4)],
+            [(ri 3 5, 4), (ri 2 2, 2)],
+            [(ri 3 5, 4), (ri 2 3, 4)]
+          ]
 
       let b5 =
             B.Board
@@ -451,32 +455,57 @@ spec = do
                 B.turn = 0
               }
 
-      getLegalBuildAt' b5 0 (ri 3 3)
-        `shouldBe` [ [(ri 1 3, 2)],
-                     [(ri 1 4, 1)],
-                     [(ri 1 5, 3)],
-                     [(ri 2 3, 3)],
-                     [(ri 3 3, 3)],
-                     [(ri 3 5, 4)],
-                     [(ri 1 3, 2), (ri 2 2, 2)],
-                     [(ri 1 3, 2), (ri 2 3, 3)],
-                     [(ri 1 3, 2), (ri 2 4, 1)],
-                     [(ri 1 4, 1), (ri 2 2, 2)],
-                     [(ri 1 4, 1), (ri 2 3, 3)],
-                     [(ri 1 4, 1), (ri 2 4, 1)],
-                     [(ri 1 5, 3), (ri 2 2, 2)],
-                     [(ri 1 5, 3), (ri 2 3, 3)],
-                     [(ri 1 5, 3), (ri 2 4, 1)],
-                     [(ri 2 3, 3), (ri 2 2, 2)],
-                     [(ri 2 3, 4)],
-                     [(ri 2 3, 3), (ri 2 4, 1)],
-                     [(ri 3 3, 3), (ri 2 2, 2)],
-                     [(ri 3 3, 3), (ri 2 3, 3)],
-                     [(ri 3 3, 3), (ri 2 4, 1)],
-                     [(ri 3 5, 4), (ri 2 2, 2)],
-                     [(ri 3 5, 4), (ri 2 3, 3)],
-                     [(ri 3 5, 4), (ri 2 4, 1)]
-                   ]
+      (sort . map sort) (getLegalBuildAt' b5 0 (ri 3 3))
+        `shouldBe` (sort . map sort)
+          [ [(ri 1 3, 2)],
+            [(ri 1 4, 1)],
+            [(ri 1 5, 3)],
+            [(ri 2 3, 3)],
+            [(ri 3 3, 3)],
+            [(ri 3 5, 4)],
+            [(ri 1 3, 2), (ri 2 2, 2)],
+            [(ri 1 3, 2), (ri 2 3, 3)],
+            [(ri 1 3, 2), (ri 2 4, 1)],
+            [(ri 1 4, 1), (ri 2 2, 2)],
+            [(ri 1 4, 1), (ri 2 3, 3)],
+            [(ri 1 4, 1), (ri 2 4, 1)],
+            [(ri 1 5, 3), (ri 2 2, 2)],
+            [(ri 1 5, 3), (ri 2 3, 3)],
+            [(ri 1 5, 3), (ri 2 4, 1)],
+            [(ri 2 3, 3), (ri 2 2, 2)],
+            [(ri 2 3, 4)],
+            [(ri 2 3, 3), (ri 2 4, 1)],
+            [(ri 3 3, 3), (ri 2 2, 2)],
+            [(ri 3 3, 3), (ri 2 3, 3)],
+            [(ri 3 3, 3), (ri 2 4, 1)],
+            [(ri 3 5, 4), (ri 2 2, 2)],
+            [(ri 3 5, 4), (ri 2 3, 3)],
+            [(ri 3 5, 4), (ri 2 4, 1)]
+          ]
+
+      let b6 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Prometheus, B.tokens = Just ((1, 2), (5, 5))},
+                    B.Player {B.card = Pan, B.tokens = Just ((3, 4), (4, 4))}
+                  ),
+                B.spaces =
+                  [ [3, 2, 0, 0, 0],
+                    [4, 4, 4, 0, 0],
+                    [0, 0, 0, 0, 0],
+                    [0, 0, 0, 4, 4],
+                    [0, 0, 0, 4, 0]
+                  ],
+                B.turn = 0
+              }
+
+      (sort . map sort) (getLegalBuildAt' b6 0 (ri 1 1))
+        `shouldBe` (sort . map sort)
+          [ [(ri 1 1, 4)],
+            [(ri 1 3, 1)],
+            [(ri 1 2, 3), (ri 1 1, 4)],
+            [(ri 1 2, 3), (ri 1 3, 1)]
+          ]
 
     it "works with other cards" $ do
       let b1 =
@@ -543,14 +572,15 @@ spec = do
 
     it "works with Artemis" $ do
       let pm1 = createPlayerMap [[ri 2 4, ri 3 4], [ri 3 3, ri 5 5]]
-      let lv = Map.fromList $
+      let lv =
+            Map.fromList $
               (zip validIndices . concat)
-                  [ [1, 0, 1, 2, 0],
-                    [0, 0, 1, 0, 4],
-                    [0, 0, 0, 1, 4],
-                    [0, 2, 3, 0, 4],
-                    [0, 2, 0, 2, 2]
-                  ]
+                [ [1, 0, 1, 2, 0],
+                  [0, 0, 1, 0, 4],
+                  [0, 0, 0, 1, 4],
+                  [0, 2, 3, 0, 4],
+                  [0, 2, 0, 2, 2]
+                ]
       let lm = createLevelMap lv
       hasWinningMove (Just Artemis) 1 pm1 lm `shouldBe` True
 
