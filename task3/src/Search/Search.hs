@@ -115,6 +115,8 @@ searchMiniMax' g@GameState {GS.legalMoves = mv} depth shouldMaximize sofar =
 --------------------------------------------------------------------------------
 -- Alpha-beta Search
 --------------------------------------------------------------------------------
+alphaBetaMaxWidth :: Int
+alphaBetaMaxWidth = 128
 
 searchAlphaBetaNaive :: GameState -> Int -> (Score, GameMove)
 searchAlphaBetaNaive g@GameState {GS.turn = t} depth =
@@ -131,7 +133,7 @@ searchAlphaBetaNaive' g@GameState {GS.legalMoves = mv} depth alpha beta shouldMa
     (Just sc, Nothing) -> (sc, sofar) -- terminal node
     (Just sc, Just m) -> (sc, m : sofar) -- terminal node
     (Nothing, _) ->
-      let nextStates = fmap (makeMove g) mv --(take (depth * 20) mv) -- branch cut
+      let nextStates = fmap (makeMove g) (take alphaBetaMaxWidth mv) -- branch cut
           bestScore = if shouldMaximize then - scoreWin - 1 else scoreWin + 1
        in searchAlphaBetaNaive'' (zip mv nextStates) depth alpha beta shouldMaximize sofar (bestScore, [])
 
