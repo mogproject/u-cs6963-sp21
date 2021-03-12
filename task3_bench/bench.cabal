@@ -1,0 +1,28 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 65a6ee054b39d71cdb934c90e30dfed419a2a3d1535c82a8a7580d389e628778
+
+name:           bench
+version:        0.1.0
+author:         Yosuke Mizutani <yos@cs.utah.edu>
+maintainer:     Yosuke Mizutani <yos@cs.utah.edu>
+copyright:      (c) 2021 Yosuke Mizutani
+license:        Apache-2.0
+build-type:     Simple
+
+executable bench
+  main-is: bench.hs
+  other-modules:
+      Paths_bench
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -O2
+  build-depends:
+      base ==4.*
+    , containers
+    , criterion
+  default-language: Haskell2010

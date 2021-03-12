@@ -1,0 +1,19 @@
+name: bench
+version: 0.1.0
+license: Apache-2.0
+copyright: (c) 2021 Yosuke Mizutani
+author: Yosuke Mizutani <yos@cs.utah.edu>
+maintainer: Yosuke Mizutani <yos@cs.utah.edu>
+
+ghc-options: -Wall -O2
+
+dependencies:
+  - base == 4.*
+  - containers
+  - criterion
+
+executables:
+  bench:
+    main: bench.hs
+    source-dirs: [src]
+    dependencies: []
