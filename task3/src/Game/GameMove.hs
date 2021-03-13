@@ -43,9 +43,9 @@ type GameMove = Int64
 --             x                                                          | step bld | 0: build that enables my worker to move up; 1: otherwise
 --              x                                                         | block bld| 0: build that disables one of the opponent's moving up; 1: otherwise
 --               xxx                                                      | mv to lv | 7 - (move to level)
---      xxx                                                               | bld lv(2)| 7 - (level after build(2))
+--      xxx                                                               | bld lv(2)| priority (level after build(2))
 --                        xxx                                             | bld bl(2)| level before build(2)
---          xxx                                                           | bld lv(1)| 7 - (level after build(1))
+--          xxx                                                           | bld lv(1)| priority - (level after build(1))
 --                               xxx                                      | bld bl(1)| level bfter build(1)
 --                                  x                                     | dbl mv   | 0: double move; 1: otherwise
 --                                   x                                    | mv op    | 0: opponent worker is pushed or swapped; 1: otherwise

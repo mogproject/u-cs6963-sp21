@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 module Game.Evaluation
   ( Score,
     evaluate,
@@ -45,6 +46,9 @@ scoreWin = 1000000000 -- 1e9
 
 evalProxTable :: V.Vector Score
 evalProxTable = V.fromList [0, 1000, 990, 50, 20, 0]
+
+evalProxDisconnected :: Score
+evalProxDisconnected = -20000
 
 evalProxTableSize :: Int
 evalProxTableSize = V.length evalProxTable
@@ -205,8 +209,8 @@ evaluate
               evaluateAsymmetry pl lv lm bestDist,
               evaluateStuckBonus pl adj,
               evaluatePrevention pl lv lm bestDist,
-              evaluateDoubleLizhiBonus cs pl pm lv lm,
-              evaluatePrometeusBonus cs pm lm
+              evaluateDoubleLizhiBonus cs pl pm lv lm
+              -- evaluatePrometeusBonus cs pm lm
             ]
        in sign * sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
     where
@@ -225,7 +229,9 @@ evaluate'
 
 -- (1) Worker Proximity
 evaluateWorkerProximity :: Players -> [[IntMap Int]] -> Int -> Score
-evaluateWorkerProximity pl dist p = sum [getProxTableValue (dist !! p !! w ! (pl !! p !! (1 - w))) | w <- [0, 1]]
+evaluateWorkerProximity pl dist p =
+  let val = sum [getProxTableValue (dist !! p !! w ! (pl !! p !! (1 - w))) | w <- [0, 1]]
+   in if val == 0 then evalProxDisconnected else val
 
 -- (2) Reachability
 evaluateReachability :: Cards -> Levels -> [IntMap Int] -> Int -> Score

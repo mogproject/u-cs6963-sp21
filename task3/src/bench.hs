@@ -242,14 +242,14 @@ main = do
   defaultMain
     [ bgroup
         "search opening"
-        [ bench "ɑ-β: depth 1" $ nf (searchAlphaBetaNaive s1) 1,
-          bench "ɑ-β: depth 2" $ nf (searchAlphaBetaNaive s1) 2,
-          bench "ɑ-β: depth 3" $ nf (searchAlphaBetaNaive s1) 3
+        [ bench "ɑ-β: depth 1" $ nf (searchAlphaBeta s1) 1,
+          bench "ɑ-β: depth 2" $ nf (searchAlphaBeta s1) 2,
+          bench "ɑ-β: depth 3" $ nf (searchAlphaBeta s1) 3
         ],
       bgroup
         "search end-game"
-        [ bench "ɑ-β: depth 1" $ nf (searchAlphaBetaNaive s2) 1,
-          bench "ɑ-β: depth 2" $ nf (searchAlphaBetaNaive s2) 2,
-          bench "ɑ-β: depth 3" $ nf (searchAlphaBetaNaive s2) 3
+        [ bench "ɑ-β: depth 1" $ nf (searchAlphaBeta s2) 1,
+          bench "ɑ-β: depth 2" $ nf (searchAlphaBeta s2) 2,
+          bench "ɑ-β: depth 3" $ nf (searchAlphaBeta s2) 3
         ]
     ]
