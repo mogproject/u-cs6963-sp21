@@ -359,7 +359,7 @@ spec = do
                 B.turn = 39
               }
       let s1 = fromBoard b1
-      printAllMoves s1
+      -- printAllMoves s1
 
       mv <- findMoveWithTimeout 5000000 Nothing s1
       getMoveTo mv `shouldBe` posToIndex (3, 4)

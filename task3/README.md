@@ -94,6 +94,22 @@ $ docker images   # check if a new image exists
 
 - Now, you may exit from the container.
 
+###  Second time and later
+
+```
+$ docker -run -i -t -m 8g yo/santorini
+$ cd u-cs6963-sp21/task3
+$ git pull
+$ stack build && stack install
+```
+
+- On host machine
+
+```
+$ docker ps       # check your <CONTAINER_ID>
+$ docker cp <CONTAINER_ID>:/root/.local/bin/santorini-player ./yo-player
+```
+
 ## Running on the CADE environment
 
 - Upload files to the CADE environment.
