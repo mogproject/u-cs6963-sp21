@@ -4,7 +4,7 @@ import Data.Bits (Bits ((.|.)))
 import Data.Board (readBoard)
 import qualified Data.Board as B
 import Data.Card
-import Data.IntMap ((!))
+-- import Data.IntMap ((!))
 import qualified Data.IntMap as Map
 import Data.List (sort)
 import Data.Maybe (fromMaybe)
@@ -41,7 +41,7 @@ getLegalBuildAt' b wk moveFrom =
           levels = lv,
           levelMap = lm
         } = fromBoard b
-      emptySpace = ((lm !! 7) `andNotBB` (pm ! 6)) .|. singletonBB (pl !! 0 !! wk)
+      emptySpace = ((lm !! 7) `andNotBB` (pm !! 6)) .|. singletonBB (pl !! 0 !! wk)
       result = getLegalBuildAt (cs !! 0) lv emptySpace moveFrom (pl !! 0 !! wk)
    in [[(x, z) | (x, _, z) <- r] | r <- result]
 

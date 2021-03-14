@@ -29,6 +29,7 @@ module Game.GameState
     isWinningMove,
     hasWinningMove,
     makeNextLevelMap,
+    updatePlayerMap,
   )
 where
 
@@ -50,7 +51,7 @@ type Cards = [Maybe Card]
 
 type Players = [[Index]]
 
-type PlayerMap = IntMap BitBoard
+type PlayerMap = [BitBoard]
 
 type Turn = Int
 
@@ -141,7 +142,7 @@ createPlayerMap pl =
       v4 = (m !! 0) .|. (m !! 1)
       v5 = (m !! 2) .|. (m !! 3)
       v6 = v4 .|. v5
-   in Map.fromList $ zip [0 ..] (m ++ [v4, v5, v6])
+   in m ++ [v4, v5, v6]
 
 createLevelMap :: Levels -> LevelMap
 -- createLevelMap lv =
@@ -190,9 +191,9 @@ getLegalMoveTo :: Maybe Card -> Index -> PlayerMap -> LevelMap -> [Index]
 -- to the original space.
 
 getLegalMoveTo (Just Artemis) mf pm lm =
-  let firstMove = getLegalMoveTo' mf lm `andNotBB` (pm ! 6)
+  let firstMove = getLegalMoveTo' mf lm `andNotBB` (pm !! 6)
       secondMoveFrom = (if mf `elemBB` (lm !! 2) then (\x -> x `andNotBB` (lm !! 3)) else id) firstMove
-   in bbToList $ foldl' (\z x -> z .|. getLegalMoveTo' x lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm ! 6)
+   in bbToList $ foldl' (\z x -> z .|. getLegalMoveTo' x lm) firstMove (bbToList secondMoveFrom) `andNotBB` (pm !! 6)
 --
 -- =========================================================================================
 --     Less efficient implementation
@@ -210,8 +211,8 @@ getLegalMoveTo (Just Artemis) mf pm lm =
 -- --
 -- getLegalMoveTo (Just Artemis) mf pm lm =
 --   let mfBB = singletonBB mf
---       (xs, a) = getLegalMoveTo'' lm (pm ! 6) (mfBB .&. (lm !! 0), mfBB .&. (lm !! 1), mfBB .&. (lm !! 2), mfBB .&. (lm !! 3))
---       ((y0, y1, y2, y3), b) = getLegalMoveTo'' lm (pm ! 6) xs
+--       (xs, a) = getLegalMoveTo'' lm (pm !! 6) (mfBB .&. (lm !! 0), mfBB .&. (lm !! 1), mfBB .&. (lm !! 2), mfBB .&. (lm !! 3))
+--       ((y0, y1, y2, y3), b) = getLegalMoveTo'' lm (pm !! 6) xs
 --    in bbToList $ y0 .|. y1 .|. y2 .|. y3 .|. a .|. b
 -- =========================================================================================
 --
@@ -221,8 +222,8 @@ getLegalMoveTo (Just Artemis) mf pm lm =
 -- the token would be able to move to the opponent’s space if the opponent token were not there.
 -- The unoccupied space where the opponent’s token is pushed can be at any level less than 4.
 getLegalMoveTo (Just Minotaur) mf pm lm =
-  let candidates = getLegalMoveTo' mf lm `andNotBB` (if mf `elemBB` (pm ! 4) then pm ! 4 else pm ! 5)
-      emptySpace = (lm !! 7) `andNotBB` (pm ! 6)
+  let candidates = getLegalMoveTo' mf lm `andNotBB` (if mf `elemBB` (pm !! 4) then pm !! 4 else pm !! 5)
+      emptySpace = (lm !! 7) `andNotBB` (pm !! 6)
       isValidMoveTo mt = mt `elemBB` emptySpace || getPointSymmetricIndex mt mf `elemBB` emptySpace -- works only if mf and mt are adjacent
    in filter isValidMoveTo (bbToList candidates)
 --
@@ -230,10 +231,10 @@ getLegalMoveTo (Just Minotaur) mf pm lm =
 -- A token’s move can optionally swap places with an adjacent opponent token,
 -- as long as the token would be able to move to the opponent’s space if the
 -- opponent token were not there; otherwise, the move must be to an unoccupied space as usual.
-getLegalMoveTo (Just Apollo) mf pm lm = bbToList $ getLegalMoveTo' mf lm `andNotBB` (if mf `elemBB` (pm ! 4) then pm ! 4 else pm ! 5)
+getLegalMoveTo (Just Apollo) mf pm lm = bbToList $ getLegalMoveTo' mf lm `andNotBB` (if mf `elemBB` (pm !! 4) then pm !! 4 else pm !! 5)
 --
 -- Others.
-getLegalMoveTo _ mf pm lm = bbToList $ getLegalMoveTo' mf lm `andNotBB` (pm ! 6)
+getLegalMoveTo _ mf pm lm = bbToList $ getLegalMoveTo' mf lm `andNotBB` (pm !! 6)
 
 --------------------------------------------------------------------------------
 -- Push to
@@ -318,6 +319,45 @@ getLegalBuildAt _ lv emptySpace _ mt = [[(bl, lv ! bl, (lv ! bl) + 1)] | bl <- b
 -- All legal moves
 --------------------------------------------------------------------------------
 
+updatePlayerMap :: Int -> WorkerId -> Index -> Index -> Maybe (WorkerId, Index) -> PlayerMap -> PlayerMap
+updatePlayerMap 0 0 mf mt (Just (0, pt)) [_, p1, _, p3, p4, p5, p6] =
+  let mfb = singletonBB mf
+      mtb = singletonBB mt
+      ptb = singletonBB pt
+   in [mtb, p1, ptb, p3, p4 `xor` mfb `xor` mtb, p5 `xor` mtb `xor` ptb, p6 `xor` mfb `xor` ptb]
+updatePlayerMap 0 0 mf mt (Just (1, pt)) [_, p1, p2, _, p4, p5, p6] =
+  let mfb = singletonBB mf
+      mtb = singletonBB mt
+      ptb = singletonBB pt
+   in [mtb, p1, p2, ptb, p4 `xor` mfb `xor` mtb, p5 `xor` mtb `xor` ptb, p6 `xor` mfb `xor` ptb]
+updatePlayerMap 0 1 mf mt (Just (0, pt)) [p0, _, _, p3, p4, p5, p6] =
+  let mfb = singletonBB mf
+      mtb = singletonBB mt
+      ptb = singletonBB pt
+   in [p0, mtb, ptb, p3, p4 `xor` mfb `xor` mtb, p5 `xor` mtb `xor` ptb, p6 `xor` mfb `xor` ptb]
+updatePlayerMap 0 1 mf mt (Just (1, pt)) [p0, _, p2, _, p4, p5, p6] =
+  let mfb = singletonBB mf
+      mtb = singletonBB mt
+      ptb = singletonBB pt
+   in [p0, mtb, p2, ptb, p4 `xor` mfb `xor` mtb, p5 `xor` mtb `xor` ptb, p6 `xor` mfb `xor` ptb]
+updatePlayerMap 0 0 mf mt Nothing [_, p1, p2, p3, p4, p5, p6] =
+  let mtb = singletonBB mt
+      d = mtb `xor` singletonBB mf
+   in [mtb, p1, p2, p3, p4 `xor` d, p5, p6 `xor` d]
+updatePlayerMap 0 1 mf mt Nothing [p0, _, p2, p3, p4, p5, p6] =
+  let mtb = singletonBB mt
+      d = mtb `xor` singletonBB mf
+   in [p0, mtb, p2, p3, p4 `xor` d, p5, p6 `xor` d]
+updatePlayerMap 1 0 mf mt Nothing [p0, p1, _, p3, p4, p5, p6] =
+  let mtb = singletonBB mt
+      d = mtb `xor` singletonBB mf
+   in [p0, p1, mtb, p3, p4, p5 `xor` d, p6 `xor` d]
+updatePlayerMap 1 1 mf mt Nothing [p0, p1, p2, _, p4, p5, p6] =
+  let mtb = singletonBB mt
+      d = mtb `xor` singletonBB mf
+   in [p0, p1, p2, mtb, p4, p5 `xor` d, p6 `xor` d]
+updatePlayerMap _ _ _ _ _ _ = undefined
+
 getLegalMoves' :: Bool -> GameState -> [GameMove]
 getLegalMoves'
   effectiveOnly
@@ -344,10 +384,7 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
         let applyPushTo = maybe id (uncurry setOpponentMove) pushInfo
 
         -- update player map
-        let moveDiff = listToBB [mf, mt]
-        let pushDiff = maybe 0 (\(_, pt) -> listToBB [mt, pt]) pushInfo
-        let pm' = foldl' (flip (Map.adjust (xor moveDiff))) pm [wk, 4, 6]
-        let pm'' = maybe id (\(wid, _) mm -> foldl' (flip (Map.adjust (xor pushDiff))) mm [2 + wid, 5, 6]) pushInfo pm'
+        let pm'' = updatePlayerMap 0 wk mf mt pushInfo pm
 
         -- check point 1
         let moveSofar = (applyPushTo . applyDoubleMove . setMoveTo mt . setMoveFrom mf . setWorkerId wk) createGameMove
@@ -359,7 +396,7 @@ getLegalMoves effectiveOnly [c1, c2] pl pm lv lm =
             return $ setWin moveSofar
           else do
             -- build at
-            let emptySpace = ((lm !! 7) `andNotBB` (pm'' ! 6)) .|. singletonBB mt
+            let emptySpace = ((lm !! 7) `andNotBB` (pm'' !! 6)) .|. singletonBB mt
             bls <- getLegalBuildAt c1 lv emptySpace mf mt
 
             -- check next levels
@@ -404,37 +441,37 @@ isWinningMove _ mf mt lm = mt `elemBB` (lm !! 3) && mf `elemBB` (lm !! 6)
 hasWinningMove :: Maybe Card -> Int -> PlayerMap -> LevelMap -> Bool
 -- Pan: ((N[P4 & L2] & (L0 & L3)) | (N[P4 & L3] & L5)) & ~P6
 hasWinningMove (Just Pan) p pm lm =
-  let fromLv2 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm !! 2)) .&. ((lm !! 0) .|. (lm !! 3))
-      fromLv3 = getClosedNeighborhood ((pm ! (4 + p)) .&. (lm !! 3)) .&. (lm !! 5)
-   in (fromLv2 .|. fromLv3) `andNotBB` (pm ! 6) /= 0
+  let fromLv2 = getClosedNeighborhood ((pm !! (4 + p)) .&. (lm !! 2)) .&. ((lm !! 0) .|. (lm !! 3))
+      fromLv3 = getClosedNeighborhood ((pm !! (4 + p)) .&. (lm !! 3)) .&. (lm !! 5)
+   in (fromLv2 .|. fromLv3) `andNotBB` (pm !! 6) /= 0
 -- Artemis: N[L3 & ~P6] & L2 & (P4 | (N[P4 & ~L0] & ~P6))
 hasWinningMove (Just Artemis) p pm lm =
-  let x = (pm ! (4 + p)) `andNotBB` (lm !! 0) -- Artemis workers at Lv 1, 2, or 3
-      a = getClosedNeighborhood ((lm !! 3) `andNotBB` (pm ! 6)) .&. (lm !! 2) -- Lv2 spaces next to empty Lv3
-      b = getClosedNeighborhood x `andNotBB` (pm ! 6) -- Artemis workers' empty neighbors
+  let x = (pm !! (4 + p)) `andNotBB` (lm !! 0) -- Artemis workers at Lv 1, 2, or 3
+      a = getClosedNeighborhood ((lm !! 3) `andNotBB` (pm !! 6)) .&. (lm !! 2) -- Lv2 spaces next to empty Lv3
+      b = getClosedNeighborhood x `andNotBB` (pm !! 6) -- Artemis workers' empty neighbors
    in a .&. (x .|. b) /= 0
 -- Minotaur
 hasWinningMove (Just Minotaur) p pm lm =
-  let x = (pm ! (4 + p)) .&. (lm !! 2)
-      y = getClosedNeighborhood x .&. (lm !! 3) .&. (pm ! (5 - p))
+  let x = (pm !! (4 + p)) .&. (lm !! 2)
+      y = getClosedNeighborhood x .&. (lm !! 3) .&. (pm !! (5 - p))
       q = getPushBB x y
-   in hasWinningMove Nothing p pm lm || q .&. (lm !! 7) `andNotBB` (pm ! 6) /= 0
+   in hasWinningMove Nothing p pm lm || q .&. (lm !! 7) `andNotBB` (pm !! 6) /= 0
 -- Others: N[P4 & L2] & L3 & ~P6
 hasWinningMove _ p pm lm =
-  getClosedNeighborhood ((pm ! (4 + p)) .&. (lm !! 2)) .&. (lm !! 3) `andNotBB` (pm ! 6) /= 0
+  getClosedNeighborhood ((pm !! (4 + p)) .&. (lm !! 2)) .&. (lm !! 3) `andNotBB` (pm !! 6) /= 0
 
 isBlocking :: BitBoard -> PlayerMap -> LevelMap -> Bool
-isBlocking buildTo pmBefore lm =
+isBlocking buildTo pm lm =
   -- lm before
-  let fromLv0 = getClosedNeighborhood ((pmBefore ! 5) .&. (lm !! 0)) .&. (lm !! 1)
-      fromLv1 = getClosedNeighborhood ((pmBefore ! 5) .&. (lm !! 1)) .&. (lm !! 2)
+  let fromLv0 = getClosedNeighborhood ((pm !! 5) .&. (lm !! 0)) .&. (lm !! 1)
+      fromLv1 = getClosedNeighborhood ((pm !! 5) .&. (lm !! 1)) .&. (lm !! 2)
    in buildTo .&. (fromLv0 .|. fromLv1) /= 0
 
 isStepping :: BitBoard -> PlayerMap -> LevelMap -> Bool
-isStepping buildTo pmAfter lm =
+isStepping buildTo pm lm =
   -- lm after
-  let fromLv0 = getClosedNeighborhood ((pmAfter ! 4) .&. (lm !! 0)) .&. (lm !! 1)
-      fromLv1 = getClosedNeighborhood ((pmAfter ! 4) .&. (lm !! 1)) .&. (lm !! 2)
+  let fromLv0 = getClosedNeighborhood ((pm !! 4) .&. (lm !! 0)) .&. (lm !! 1)
+      fromLv1 = getClosedNeighborhood ((pm !! 4) .&. (lm !! 1)) .&. (lm !! 2)
    in buildTo .&. (fromLv0 .|. fromLv1) /= 0
 
 --------------------------------------------------------------------------------
