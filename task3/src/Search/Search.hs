@@ -129,7 +129,7 @@ searchMiniMax' g@GameState {GS.legalMoves = mv} depth shouldMaximize sofar =
 -- Alpha-beta Search
 --------------------------------------------------------------------------------
 alphaBetaMaxWidth :: Int
-alphaBetaMaxWidth = 150
+alphaBetaMaxWidth = 400
 
 fetchNextMove :: GameState -> (Score, [GameMove]) -> GameMove
 fetchNextMove g (_, []) = head (getLegalMoves' False g)
