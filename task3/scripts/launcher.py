@@ -4,7 +4,7 @@ Santorini benchmark launcher.
 """
 
 __author__ = 'Yosuke Mizutani'
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 __license__ = 'Apache License, Version 2.0'
 
 import sys
@@ -54,7 +54,7 @@ def main(args):
 
     cmd = [args.judge_exe]
     if args.timeout is not None:
-        cmd += ['--timeout', args.timeout]
+        cmd += ['--timeout', str(args.timeout)]
     if args.cards is not None:
         cmd += ['--cards'] + args.cards
     cmd += [args.player1_exe, args.player2_exe]

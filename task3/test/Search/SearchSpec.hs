@@ -305,26 +305,14 @@ spec = do
       mv2c <- findMoveWithTimeout 5000000 Nothing s1
       getBuildAt mv2c `shouldBe` [(posToIndex (2, 1), 3, 4)]
 
-    -- it "finds a defensive move" $ do
-    --   -- {"players":[{"card":"Artemis","tokens":[[3,5],[5,2]]},{"card":"Prometheus","tokens":[[3,2],[4,4]]}],"spaces":[[0,3,0,0,0],[3,0,0,0,0],[0,1,0,4,1],[0,4,2,2,0],[1,0,4,0,0]],"turn":20}
+      mv3a <- findMoveWithTimeout 30000000 (Just 3) s1
+      getBuildAt mv3a `shouldBe` [(posToIndex (2, 1), 3, 4)]
 
-    --   let b1 =
-    --         B.Board
-    --           { B.players =
-    --               ( B.Player {B.card = Artemis, B.tokens = Just ((3, 5), (5, 2))},
-    --                 B.Player {B.card = Prometheus, B.tokens = Just ((3, 2), (4, 4))}
-    --               ),
-    --             B.spaces = [[0, 3, 0, 0, 0], [3, 0, 0, 0, 0], [0, 1, 0, 4, 1], [0, 4, 2, 2, 0], [1, 0, 4, 0, 0]],
-    --             B.turn = 20
-    --           }
-    --   let s1 = fromBoard b1
+      mv3b <- findMoveWithTimeout 30000000 (Just 4) s1 -- acknowledges the loss
+      getBuildAt mv3b `shouldBe` [(posToIndex (2, 1), 3, 4)]
 
-    --   -- let s2 = makeMove s1 $ legalMoves s1 !! 6
-    --   -- printAllMoves s2
-
-    --   mv2c <- findMoveWithTimeout 5000000 Nothing s1
-    --   -- print (showMove mv2c)    -- Worker[2]@(5,2) -> (3,1): ((2,1), lv=4)
-    --   getBuildAt mv2c `shouldBe` [(posToIndex (2, 1), 3, 4)]
+      mv3c <- findMoveWithTimeout 30000000 Nothing s1
+      getBuildAt mv3c `shouldBe` [(posToIndex (2, 1), 3, 4)]
 
     it "finds a defensive move" $ do
       -- {"players":[{"card":"Artemis","tokens":[[4,3],[4,5]]},{"card":"Prometheus","tokens":[[3,3],[4,4]]}],"spaces":[[0,0,0,0,0],[0,0,0,0,0],[0,1,2,0,0],[1,1,0,0,0],[1,1,0,2,0]],"turn":7}
@@ -346,21 +334,58 @@ spec = do
       mv <- findMoveWithTimeout 5000000 Nothing s1
       any (\p -> getMoveTo mv == p) [posToIndex (3, 2), posToIndex (4, 2)] `shouldBe` True
 
-    it "makes a double build" $ do
-      -- {"players":[{"card":"Prometheus","tokens":[[4,3],[5,1]]},{"card":"Apollo","tokens":[[1,2],[3,3]]}],"spaces":[[4,2,1,4,0],[4,0,4,3,0],[4,1,2,1,0],[4,1,2,4,0],[2,4,4,1,0]],"turn":39}
+      mv1 <- findMoveWithTimeout 30000000 Nothing s1
+      any (\p -> getMoveTo mv1 == p) [posToIndex (3, 2), posToIndex (4, 2)] `shouldBe` True
+
+    -- it "makes a double build" $ do
+    --   -- {"players":[{"card":"Prometheus","tokens":[[4,3],[5,1]]},{"card":"Apollo","tokens":[[1,2],[3,3]]}],"spaces":[[4,2,1,4,0],[4,0,4,3,0],[4,1,2,1,0],[4,1,2,4,0],[2,4,4,1,0]],"turn":39}
+
+    --   -- Prometheus vs Apollo
+    --   -- xxx (2)  1  xxx  0
+    --   -- xxx  0  xxx  3   0
+    --   -- xxx  1  (2)  1   0
+    --   -- xxx  1  [2] xxx  0
+    --   -- [2] xxx xxx  1   0
+    --   -- has to prevent Apollo (3,3)'s moving up to (2,4)
+    --   -- if Prometheus doesn't build at (3,4), then its workers will be separated by (3,3)'s move to (3,4) and building at (3,3).
+
+    --   let b1 =
+    --         B.Board
+    --           { B.players =
+    --               ( B.Player {B.card = Prometheus, B.tokens = Just ((4, 3), (5, 1))},
+    --                 B.Player {B.card = Apollo, B.tokens = Just ((1, 2), (3, 3))}
+    --               ),
+    --             B.spaces = [[4, 2, 1, 4, 0], [4, 0, 4, 3, 0], [4, 1, 2, 1, 0], [4, 1, 2, 4, 0], [2, 4, 4, 1, 0]],
+    --             B.turn = 39
+    --           }
+    --   let s1 = fromBoard b1
+    --   -- printAllMoves s1
+
+    --   mv <- findMoveWithTimeout 5000000 Nothing s1
+    --   getMoveTo mv `shouldBe` posToIndex (3, 4)
+    --   getBuildAt mv `shouldBe` [(posToIndex (2, 4), 3, 4), (posToIndex (3, 4), 1, 2)]
+
+    --   mv1 <- findMoveWithTimeout 30000000 Nothing s1
+    --   getMoveTo mv1 `shouldBe` posToIndex (3, 4)
+    --   getBuildAt mv1 `shouldBe` [(posToIndex (2, 4), 3, 4), (posToIndex (3, 4), 1, 2)]
+
+    it "does not make a step for opponent" $ do
+      -- {"players":[{"card":"Artemis","tokens":[[2,2],[3,4]]},{"card":"Prometheus","tokens":[[2,4],[4,3]]}],"spaces":[[0,2,1,0,0],[0,1,1,1,0],[0,1,0,0,3],[0,0,1,0,0],[0,1,3,0,0]],"style":{"desc":false,"players":["yo-2021-03-13","play-rate"]},"turn":12}
 
       let b1 =
             B.Board
               { B.players =
-                  ( B.Player {B.card = Prometheus, B.tokens = Just ((4, 3), (5, 1))},
-                    B.Player {B.card = Apollo, B.tokens = Just ((1, 2), (3, 3))}
+                  ( B.Player {B.card = Artemis, B.tokens = Just ((2, 2), (3, 4))},
+                    B.Player {B.card = Prometheus, B.tokens = Just ((2, 4), (4, 3))}
                   ),
-                B.spaces = [[4, 2, 1, 4, 0], [4, 0, 4, 3, 0], [4, 1, 2, 1, 0], [4, 1, 2, 4, 0], [2, 4, 4, 1, 0]],
-                B.turn = 39
+                B.spaces = [[0, 2, 1, 0, 0], [0, 1, 1, 1, 0], [0, 1, 0, 0, 3], [0, 0, 1, 0, 0], [0, 1, 3, 0, 0]],
+                B.turn = 12
               }
       let s1 = fromBoard b1
       -- printAllMoves s1
 
       mv <- findMoveWithTimeout 5000000 Nothing s1
-      getMoveTo mv `shouldBe` posToIndex (3, 4)
-      getBuildAt mv `shouldBe` [(posToIndex (2, 4), 3, 4), (posToIndex (3, 4), 1, 2)]
+      getBuildAt mv `shouldNotBe` [(posToIndex (1, 3), 1, 2)]
+
+      mv1 <- findMoveWithTimeout 30000000 Nothing s1
+      getBuildAt mv1 `shouldNotBe` [(posToIndex (1, 3), 1, 2)]

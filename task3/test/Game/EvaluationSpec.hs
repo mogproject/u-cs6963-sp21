@@ -1,18 +1,9 @@
 module Game.EvaluationSpec (spec) where
 
--- import Control.Monad
-
--- writeBoard,
-
--- evaluatePrevention',
-
--- evaluateStuckBonus',
-
 import Control.Monad (forM_)
 -- import Data.Bits (Bits (xor, (.&.)))
-import Data.Board
-  ( readBoard,
-  )
+import Data.Board (readBoard)
+import qualified Data.Board as B
 import Data.Card
 -- import Data.IntMap ((!))
 import qualified Data.IntMap as Map
@@ -22,17 +13,6 @@ import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 import Game.BitBoard
 import Game.Evaluation
-  ( evaluate,
-    evaluateAsymmetry',
-    evaluateReachability',
-    evaluateWorkerProximity',
-    hasDoubleLizhi,
-    hasOneXiangting,
-    hasOneXiangtingArtemis,
-    hasOneXiangtingMinotaur'',
-    hasOneXiangtingPrometheus',
-    scoreWin,
-  )
 import Game.GameMove
 import Game.GameState
 import Test.Hspec
@@ -80,15 +60,13 @@ spec = do
       evaluateWorkerProximity' b21 0 `shouldBe` evaluateWorkerProximity' b22 0
       evaluateWorkerProximity' b22 0 `shouldBe` evaluateWorkerProximity' b22 1
 
-      evaluateReachability' b21 0 `shouldBe` 401
-      evaluateReachability' b21 1 `shouldBe` 581
-      evaluateReachability' b22 0 `shouldBe` 389
-      evaluateReachability' b22 1 `shouldBe` 602
+      evaluateReachability' b22 0 < evaluateReachability' b21 0 `shouldBe` True
+      evaluateReachability' b21 0 < evaluateReachability' b21 1 `shouldBe` True
+      evaluateReachability' b21 1 < evaluateReachability' b22 1 `shouldBe` True
 
-      evaluateAsymmetry' b21 0 `shouldBe` 170
-      evaluateAsymmetry' b21 1 `shouldBe` 330
-      evaluateAsymmetry' b22 0 `shouldBe` 160
-      evaluateAsymmetry' b22 1 `shouldBe` 260
+      evaluateAsymmetry' b22 0 < evaluateAsymmetry' b21 0 `shouldBe` True
+      evaluateAsymmetry' b21 0 < evaluateAsymmetry' b22 1 `shouldBe` True
+      evaluateAsymmetry' b22 1 < evaluateAsymmetry' b21 1 `shouldBe` True
 
       -- s21 is better for Player1
       evaluate b21 > evaluate b22 `shouldBe` True
@@ -149,6 +127,36 @@ spec = do
       toBoard b52' `shouldBe` toBoard b53
       b52' `shouldBe` b53
       eval s53 `shouldBe` evaluate b52'
+
+    it "prefers early builders" $ do
+      let b1 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Prometheus, B.tokens = Just ((5, 4), (5, 1))},
+                    B.Player {B.card = Apollo, B.tokens = Just ((1, 3), (3, 2))}
+                  ),
+                B.spaces = [[4, 2, 1, 4, 0], [4, 1, 4, 4, 0], [4, 1, 4, 1, 0], [4, 2, 2, 4, 0], [2, 4, 4, 1, 2]],
+                B.turn = 45
+              }
+      let s1 = fromBoard b1
+
+      let b2 =
+            B.Board
+              { B.players =
+                  ( B.Player {B.card = Prometheus, B.tokens = Just ((5, 4), (5, 1))},
+                    B.Player {B.card = Apollo, B.tokens = Just ((1, 2), (4, 2))}
+                  ),
+                B.spaces = [[4, 2, 1, 4, 0], [4, 0, 4, 4, 0], [4, 1, 4, 1, 0], [4, 2, 3, 4, 0], [2, 4, 4, 1, 2]],
+                B.turn = 45
+              }
+      let s2 = fromBoard b2
+
+      -- print $ evaluateDetails s1
+      -- print $ evaluate s1
+      -- print $ evaluateDetails s2
+      -- print $ evaluate s2
+
+      evaluate s1 > evaluate s2 `shouldBe` True
 
   describe "Evaluation#hasDoubleLizhi()" $ do
     it "Works with Pan" $ do

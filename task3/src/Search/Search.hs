@@ -8,7 +8,7 @@ import qualified Control.Exception
 
 -- import Data.Time.Clock (addUTCTime, getCurrentTime, secondsToNominalDiffTime)
 
--- import Control.Monad (forM_)
+import Control.Monad (forM_, when)
 import Data.List (maximumBy, minimumBy)
 import Data.Ord (comparing)
 import Game.Evaluation (Score, evaluate, evaluate', scoreWin)
@@ -31,6 +31,9 @@ findMove 4 _ (Just depth) g = fetchNextMove g $ searchAlphaBeta g depth
 -- (unexpected strategy or no valid moves)
 findMove _ _ _ _ = undefined
 
+enableDebugPrint :: Bool
+enableDebugPrint = False
+
 findMoveWithTimeout :: Int -> Maybe Int -> GameState -> IO GameMove
 findMoveWithTimeout timeoutMicroSeconds depthLimit g = do
   -- Create a synchronized mutable variable.
@@ -39,12 +42,13 @@ findMoveWithTimeout timeoutMicroSeconds depthLimit g = do
 
   -- Define a function.
   let compute depth = do
-        result@(sc, _) <- Control.Exception.evaluate $ searchAlphaBeta g depth
+        result@(sc, xs) <- Control.Exception.evaluate $ searchAlphaBeta g depth
 
         -- DEBUG
-        -- putStrLn $ "[DEBUG] AlphaBeta: depth=" ++ show depth ++ ", score=" ++ show sc ++ ", moves=["
-        -- forM_ (reverse xs) (\x -> putStr $ "  " ++ showMove x ++ ",\n")
-        -- putStrLn "]"
+        when enableDebugPrint $ do
+          putStrLn $ "[DEBUG] AlphaBeta: depth=" ++ show depth ++ ", score=" ++ show sc ++ ", moves=["
+          forM_ (reverse xs) (\x -> putStr $ "  " ++ showMove x ++ ",\n")
+          putStrLn "]"
 
         x <- Control.Exception.evaluate $ fetchNextMove g result
         if sc == scoreWin * (if even (turn g) then (-1) else 1)

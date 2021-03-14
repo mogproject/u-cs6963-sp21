@@ -1,8 +1,10 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 module Game.Evaluation
   ( Score,
     evaluate,
     evaluate',
+    evaluateDetails,
     scoreWin,
     evaluateWorkerProximity',
     evaluateReachability',
@@ -112,9 +114,10 @@ evalAsymTable =
   V.fromList $
     concat
       [ [0, 0, 0, 1, 2, 3, 4, 5, 10], -- level 0
-        [0, 0, 0, 10, 20, 30, 40, 50, 100], -- level 1
-        [0, 100, 1000, 2000, 2000, 2000, 2000, 2000, 2000], -- level 2
-        [0, 1000, 20000, 30000, 30000, 30000, 30000, 30000, 30000], -- level 3
+        [0, 0, 0, 10, 20, 30, 40, 50, 9000], -- level 1
+        [0, 100, 1000, 2000, 2000, 2000, 2000, 2000, 10000], -- level 2
+        [0, 0, 0, 0, 0, 0, 0, 0, 0], -- level 3 (not very important as this leads to endgame)
+        -- [0, 1000, 20000, 30000, 30000, 30000, 30000, 30000, 30000], -- level 3
         [0, 0, 0, 0, 0, 0, 0, 0, 0] -- level 4
       ]
 
@@ -147,6 +150,21 @@ evalDoubleLizhi = 10000000
 -- one step away from double lizhi
 evalOneXiangting :: Score
 evalOneXiangting = 1000000
+
+evalStepping01 :: Score
+evalStepping01 = 100
+
+evalStepping11 :: Score
+evalStepping11 = 1000
+
+evalStepping12 :: Score
+evalStepping12 = 30000
+
+evalStepping22 :: Score
+evalStepping22 = 10000
+
+evalStepping23 :: Score
+evalStepping23 = 5000
 
 --------------------------------------------------------------------------------
 -- Distance Computation
@@ -189,32 +207,9 @@ createAdjacencyList :: LevelMap -> AdjList
 createAdjacencyList lm = V.fromList [if isValidIndex i then getLegalMoveTo' i lm else 0 | i <- [0 .. (last validIndices)]]
 
 evaluate :: GameState -> Score
-evaluate
-  g@GameState
-    { cards = cs,
-      players = pl,
-      playerMap = pm,
-      levels = lv,
-      levelMap = lm,
-      turn = t,
-      legalMoves = _
-    } = case evaluate' g of
-    (Just sc, _) -> sc
-    (Nothing, _) ->
-      let adj = V.fromList [if isValidIndex i then getLegalMoveTo' i lm else 0 | i <- [0 .. (last validIndices)]]
-          (dist, bestDist) = getDistances cs pl adj
-          funcs =
-            [ evaluateWorkerProximity pl dist,
-              evaluateReachability cs lv bestDist,
-              evaluateAsymmetry pl lv lm bestDist,
-              evaluateStuckBonus pl adj,
-              evaluatePrevention pl lv lm bestDist,
-              evaluateDoubleLizhiBonus cs pl pm lv lm
-              -- evaluatePrometeusBonus cs pm lm
-            ]
-       in sign * sum [s * f p | (s, p) <- [(1, 0), (-1, 1)], f <- funcs]
-    where
-      sign = if even t then 1 else -1
+evaluate g = case evaluate' g of
+  (Just sc, _) -> sc
+  (Nothing, _) -> (sum . concat) (evaluateDetails g)
 
 evaluate' :: GameState -> (Maybe Score, Maybe GameMove)
 evaluate'
@@ -226,6 +221,31 @@ evaluate'
       hasLost = null mv
       canWin = getWin $ head mv
       sign = if even t then 1 else -1
+
+evaluateDetails :: GameState -> [[Score]]
+evaluateDetails
+  GameState
+    { cards = cs,
+      players = pl,
+      playerMap = pm,
+      levels = lv,
+      levelMap = lm,
+      turn = t,
+      legalMoves = _
+    } =
+    let adj = V.fromList [if isValidIndex i then getLegalMoveTo' i lm else 0 | i <- [0 .. (last validIndices)]]
+        (dist, bestDist) = getDistances cs pl adj
+        funcs =
+          [ evaluateWorkerProximity pl dist,
+            evaluateReachability cs lv bestDist,
+            evaluateAsymmetry pl lv lm bestDist,
+            evaluateStuckBonus pl adj,
+            evaluatePrevention pl lv lm bestDist,
+            evaluateDoubleLizhiBonus cs pl pm lv lm,
+            evaluatePrometeusBonus cs pm lm,
+            evaluateStepping cs pl pm lv lm
+          ]
+     in [[(if even (t + p) then 1 else -1) * f p | f <- funcs] | p <- [0, 1]]
 
 -- (1) Worker Proximity
 evaluateWorkerProximity :: Players -> [[IntMap Int]] -> Int -> Score
@@ -580,6 +600,26 @@ evaluatePrometeusBonus cs pm lm p =
                 then evalPrometeus322 -- Pattern 3-(1or2)-*2
                 else 0
     else 0
+
+-- (8) Stepping Bonus
+evaluateStepping :: Cards -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Score
+evaluateStepping cs ps pm lv lm p = sum [evaluateStepping' (cs !! p) (lv ! i) (getNeighborhood i `andNotBB` (pm ! 6)) lm | w <- [0, 1], let i = ps !! p !! w]
+
+evaluateStepping' :: Maybe Card -> Int -> BitBoard -> LevelMap -> Score
+evaluateStepping' c 2 mask lm
+  | mask .&. (lm !! 3) /= 0 = evalStepping23
+  | mask .&. (lm !! 2) /= 0 = evalStepping22
+  | c == Just Prometheus && (mask .&. (lm !! 1) /= 0) = evalStepping22
+  | c == Just Pan && (mask .&. (lm !! 0) /= 0) = evalStepping23
+  | otherwise = 0
+evaluateStepping' c 1 mask lm
+  | mask .&. (lm !! 2) /= 0 = evalStepping12
+  | mask .&. (lm !! 1) /= 0 = evalStepping11
+  | c == Just Prometheus && mask .&. (lm !! 0) /= 0 = evalStepping11
+evaluateStepping' _ 0 mask lm
+  | mask .&. (lm !! 1) /= 0 = evalStepping01
+  | otherwise = 0
+evaluateStepping' _ _ _ _ = 0
 
 --------------------------------------------------------------------------------
 -- For unit testing
