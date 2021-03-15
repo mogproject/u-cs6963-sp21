@@ -151,19 +151,16 @@ evalOneXiangting :: Score
 evalOneXiangting = 1000000
 
 evalStepping01 :: Score
-evalStepping01 = 100
+evalStepping01 = 1000
 
 evalStepping11 :: Score
-evalStepping11 = 1000
+evalStepping11 = 10000
 
 evalStepping12 :: Score
-evalStepping12 = 30000
+evalStepping12 = 40000
 
 evalStepping22 :: Score
-evalStepping22 = 10000
-
-evalStepping23 :: Score
-evalStepping23 = 5000
+evalStepping22 = 60000
 
 --------------------------------------------------------------------------------
 -- Distance Computation
@@ -242,7 +239,7 @@ evaluateDetails
             evaluatePrevention pl lv lm bestDist,
             evaluateDoubleLizhiBonus cs pl pm lv lm,
             evaluatePrometeusBonus cs pm lm,
-            evaluateStepping cs pl pm lv lm
+            evaluateStepping cs pl pm lv lm bestDist
           ]
      in [[(if even (t + p) then 1 else -1) * f p | f <- funcs] | p <- [0, 1]]
 
@@ -601,24 +598,36 @@ evaluatePrometeusBonus cs pm lm p =
     else 0
 
 -- (8) Stepping Bonus
-evaluateStepping :: Cards -> Players -> PlayerMap -> Levels -> LevelMap -> Int -> Score
-evaluateStepping cs ps pm lv lm p = sum [evaluateStepping' (cs !! p) (lv ! i) (getNeighborhood i `andNotBB` (pm !! 6)) lm | w <- [0, 1], let i = ps !! p !! w]
+evaluateStepping :: Cards -> Players -> PlayerMap -> Levels -> LevelMap -> [IntMap Int] -> Int -> Score
+evaluateStepping cs ps pm lv lm dist p = sum [f i | w <- [0, 1], let i = ps !! p !! w]
+  where
+    f i = evaluateStepping' (cs !! p) (lv ! i) (getNeighborhood i `andNotBB` (pm !! 6)) lm (dist !! (1 - p))
 
-evaluateStepping' :: Maybe Card -> Int -> BitBoard -> LevelMap -> Score
-evaluateStepping' c 2 mask lm
-  | mask .&. (lm !! 3) /= 0 = evalStepping23
-  | mask .&. (lm !! 2) /= 0 = evalStepping22
-  | c == Just Prometheus && (mask .&. (lm !! 1) /= 0) = evalStepping22
-  | c == Just Pan && (mask .&. (lm !! 0) /= 0) = evalStepping23
+evaluateStepping' :: Maybe Card -> Int -> BitBoard -> LevelMap -> IntMap Int -> Score
+evaluateStepping' c 2 mask lm dist
+  | lv2nbr /= 0 && oppUnreachable lv2nbr = evalStepping22
+  | c == Just Prometheus && lv1nbr /= 0 && oppUnreachable lv1nbr = evalStepping22
   | otherwise = 0
-evaluateStepping' c 1 mask lm
-  | mask .&. (lm !! 2) /= 0 = evalStepping12
-  | mask .&. (lm !! 1) /= 0 = evalStepping11
-  | c == Just Prometheus && mask .&. (lm !! 0) /= 0 = evalStepping11
-evaluateStepping' _ 0 mask lm
-  | mask .&. (lm !! 1) /= 0 = evalStepping01
+  where
+    lv2nbr = mask .&. (lm !! 2)
+    lv1nbr = mask .&. (lm !! 1)
+    oppUnreachable bb = any (\i -> dist ! i > 1) (bbToList bb)
+evaluateStepping' c 1 mask lm dist
+  | lv2nbr /= 0 && oppUnreachable lv2nbr = evalStepping12
+  | lv1nbr /= 0 && oppUnreachable lv1nbr = evalStepping11
+  | c == Just Prometheus && lv0nbr /= 0 && oppUnreachable lv0nbr = evalStepping11
+  where
+    lv2nbr = mask .&. (lm !! 2)
+    lv1nbr = mask .&. (lm !! 1)
+    lv0nbr = mask .&. (lm !! 0)
+    oppUnreachable bb = any (\i -> dist ! i > 1) (bbToList bb)
+evaluateStepping' _ 0 mask lm dist
+  | lv1nbr /= 0 && oppUnreachable lv1nbr = evalStepping01
   | otherwise = 0
-evaluateStepping' _ _ _ _ = 0
+  where
+    lv1nbr = mask .&. (lm !! 1)
+    oppUnreachable bb = any (\i -> dist ! i > 1) (bbToList bb)
+evaluateStepping' _ _ _ _ _ = 0
 
 --------------------------------------------------------------------------------
 -- For unit testing
