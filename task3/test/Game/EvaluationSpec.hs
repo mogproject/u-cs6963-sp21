@@ -3,7 +3,7 @@ module Game.EvaluationSpec (spec) where
 import Control.Monad (forM_)
 -- import Data.Bits (Bits (xor, (.&.)))
 import Data.Board (readBoard)
-import qualified Data.Board as B
+-- import qualified Data.Board as B
 import Data.Card
 -- import Data.IntMap ((!))
 import qualified Data.IntMap as Map
@@ -32,6 +32,61 @@ eval s = evaluate $ fromBoard (fromMaybe undefined (readBoard s))
 
 spec :: Spec
 spec = do
+  describe "Evaluation#bfsBB()" $ do
+    it "computes distances" $ do
+      let pm1 = createPlayerMap [[ri 1 1, ri 3 3], [ri 5 1, ri 5 5]]
+      let lv1 =
+            Map.fromList $
+              (zip validIndices . concat)
+                [ [0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0]
+                ]
+      let lm1 = createLevelMap lv1
+      bfsBB [Nothing, Nothing] 0 (ri 3 3) pm1 lm1
+        `shouldBe` [ listToBB [ri 3 3],
+                     listToBB [ri 2 2, ri 2 3, ri 2 4, ri 3 2, ri 3 4, ri 4 2, ri 4 3, ri 4 4],
+                     listToBB [ri 1 1, ri 1 2, ri 1 3, ri 1 4, ri 1 5, ri 2 1, ri 2 5, ri 3 1, ri 3 5, ri 4 1, ri 4 5, ri 5 2, ri 5 3, ri 5 4]
+                   ]
+
+      bfsBB [Just Apollo, Nothing] 0 (ri 3 3) pm1 lm1
+        `shouldBe` [ listToBB [ri 3 3],
+                     listToBB [ri 2 2, ri 2 3, ri 2 4, ri 3 2, ri 3 4, ri 4 2, ri 4 3, ri 4 4],
+                     listToBB [ri 1 1, ri 1 2, ri 1 3, ri 1 4, ri 1 5, ri 2 1, ri 2 5, ri 3 1, ri 3 5, ri 4 1, ri 4 5, ri 5 1, ri 5 2, ri 5 3, ri 5 4, ri 5 5]
+                   ]
+
+      let pm2 = createPlayerMap [[ri 1 1, ri 1 5], [ri 2 2, ri 5 4]]
+      let lv2 =
+            Map.fromList $
+              (zip validIndices . concat)
+                [ [0, 2, 3, 3, 0],
+                  [0, 0, 1, 4, 1],
+                  [1, 4, 0, 4, 0],
+                  [0, 4, 1, 4, 1],
+                  [1, 2, 0, 0, 2]
+                ]
+      let lm2 = createLevelMap lv2
+      bfsBB [Nothing, Nothing] 0 (ri 1 1) pm2 lm2
+        `shouldBe` [ listToBB [ri 1 1],
+                     listToBB [ri 2 1],
+                     listToBB [ri 3 1],
+                     listToBB [ri 4 1],
+                     listToBB [ri 5 1],
+                     listToBB [ri 5 2],
+                     listToBB [ri 4 3, ri 5 3],
+                     listToBB [ri 3 3],
+                     listToBB [ri 2 3],
+                     listToBB [ri 1 2],
+                     listToBB [ri 1 3],
+                     listToBB [ri 1 4],
+                     listToBB [ri 1 5, ri 2 5],
+                     listToBB [ri 3 5],
+                     listToBB [ri 4 5],
+                     listToBB [ri 5 5]
+                   ]
+
   describe "Evaluation#evaluate()" $ do
     it "finds out end game" $ do
       -- no available moves
@@ -128,35 +183,35 @@ spec = do
       b52' `shouldBe` b53
       eval s53 `shouldBe` evaluate b52'
 
-    it "prefers early builders" $ do
-      let b1 =
-            B.Board
-              { B.players =
-                  ( B.Player {B.card = Prometheus, B.tokens = Just ((5, 4), (5, 1))},
-                    B.Player {B.card = Apollo, B.tokens = Just ((1, 3), (3, 2))}
-                  ),
-                B.spaces = [[4, 2, 1, 4, 0], [4, 1, 4, 4, 0], [4, 1, 4, 1, 0], [4, 2, 2, 4, 0], [2, 4, 4, 1, 2]],
-                B.turn = 45
-              }
-      let s1 = fromBoard b1
+  -- it "prefers early builders" $ do
+  --   let b1 =
+  --         B.Board
+  --           { B.players =
+  --               ( B.Player {B.card = Prometheus, B.tokens = Just ((5, 4), (5, 1))},
+  --                 B.Player {B.card = Apollo, B.tokens = Just ((1, 3), (3, 2))}
+  --               ),
+  --             B.spaces = [[4, 2, 1, 4, 0], [4, 1, 4, 4, 0], [4, 1, 4, 1, 0], [4, 2, 2, 4, 0], [2, 4, 4, 1, 2]],
+  --             B.turn = 45
+  --           }
+  --   let s1 = fromBoard b1
 
-      let b2 =
-            B.Board
-              { B.players =
-                  ( B.Player {B.card = Prometheus, B.tokens = Just ((5, 4), (5, 1))},
-                    B.Player {B.card = Apollo, B.tokens = Just ((1, 2), (4, 2))}
-                  ),
-                B.spaces = [[4, 2, 1, 4, 0], [4, 0, 4, 4, 0], [4, 1, 4, 1, 0], [4, 2, 3, 4, 0], [2, 4, 4, 1, 2]],
-                B.turn = 45
-              }
-      let s2 = fromBoard b2
+  --   let b2 =
+  --         B.Board
+  --           { B.players =
+  --               ( B.Player {B.card = Prometheus, B.tokens = Just ((5, 4), (5, 1))},
+  --                 B.Player {B.card = Apollo, B.tokens = Just ((1, 2), (4, 2))}
+  --               ),
+  --             B.spaces = [[4, 2, 1, 4, 0], [4, 0, 4, 4, 0], [4, 1, 4, 1, 0], [4, 2, 3, 4, 0], [2, 4, 4, 1, 2]],
+  --             B.turn = 45
+  --           }
+  --   let s2 = fromBoard b2
 
-      -- print $ evaluateDetails s1
-      -- print $ evaluate s1
-      -- print $ evaluateDetails s2
-      -- print $ evaluate s2
+  --   -- print $ evaluateDetails s1
+  --   -- print $ evaluate s1
+  --   -- print $ evaluateDetails s2
+  --   -- print $ evaluate s2
 
-      evaluate s1 > evaluate s2 `shouldBe` True
+  --   evaluate s1 > evaluate s2 `shouldBe` True
 
   describe "Evaluation#hasDoubleLizhi()" $ do
     it "Works with Pan" $ do

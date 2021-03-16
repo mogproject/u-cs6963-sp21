@@ -16,6 +16,8 @@ module Game.Evaluation
     hasOneXiangtingPrometheus',
     hasOneXiangtingMinotaur'',
     hasOneXiangtingArtemis,
+    bfsBB,
+    bfsBB',
   )
 where
 
@@ -66,14 +68,14 @@ evalReachTable =
       [ -- turn to move (advantageous)
         [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
         [300, 200, 40, 30, 20, 15, 12, 0], -- level 1
-        [15000, 2000, 500, 200, 150, 120, 110, 0], -- level 2
+        [30000, 2000, 500, 200, 150, 120, 110, 0], -- level 2
         [0, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3 (staying at lv 3 is not advantageous)
         [0, 0, 0, 0, 0, 0, 0, 0], -- level 4
 
         -- not turn to move
         [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
         [300, 100, 40, 30, 20, 15, 12, 0], -- level 1
-        [15000, 1000, 500, 200, 150, 120, 110, 0], -- level 2
+        [30000, 1000, 500, 200, 150, 120, 110, 0], -- level 2
         [0, 10000, 5000, 2000, 1000, 500, 300, 0], -- level 3
         [0, 0, 0, 0, 0, 0, 0, 0] -- level 4
       ]
@@ -166,6 +168,39 @@ evalStepping22 = 60000
 -- Distance Computation
 --------------------------------------------------------------------------------
 
+-- does not distinguish winning moves
+getLegalMoveToBB_ :: LevelMap -> [BitBoard] -> [BitBoard]
+getLegalMoveToBB_ lm [x0, x1, x2, x3] =
+  let xx = x0 .|. x1 .|. x2 .|. x3
+      y0 = getClosedNeighborhood xx .&. (lm !! 0)
+      y1 = getClosedNeighborhood xx .&. (lm !! 1)
+      y2 = getClosedNeighborhood (xx `xor` x0) .&. (lm !! 2)
+      y3 = getClosedNeighborhood (x2 .|. x3) .&. (lm !! 3)
+   in [y0, y1, y2, y3]
+getLegalMoveToBB_ _ _ = undefined
+
+-- getLegalMvoeToBB :: Index -> PlayerMap -> LevelMap -> BitBoard
+-- getLegalMvoeToBB moveFrom pm lm =
+
+bfsBB :: Cards -> Int -> Index -> PlayerMap -> LevelMap -> [BitBoard]
+bfsBB cs p moveFrom pm lm =
+  let forbidden = if (cs !! p) `elem` [Just Apollo, Just Minotaur] then 0 else pm !! (5 - p)
+   in bfsBB' forbidden moveFrom lm
+
+bfsBB' :: BitBoard -> Int -> LevelMap -> [BitBoard]
+bfsBB' forbidden moveFrom lm =
+  let mf = singletonBB moveFrom
+      avail = mf .|. (complement forbidden)
+      lm' = (map (.&. avail) . take 4) lm
+   in bfsBB'' mf lm'
+
+bfsBB'' :: BitBoard -> LevelMap -> [BitBoard]
+bfsBB'' mf lm = (takeWhile (/= 0) . map (sum . fst)) $ iterate f (map (.&. mf) lm, mf)
+  where
+    f (frontier, visited) =
+      let ys = getLegalMoveToBB_ lm frontier
+       in (map (`andNotBB` visited) ys, visited .|. (sum ys))
+
 distInf :: Int
 distInf = 100 -- infinity distance
 
@@ -186,11 +221,9 @@ bfs' adj avail q sofar =
       sofar' = foldl (\m u -> Map.insert u d m) sofar unseen
    in bfs' adj avail q' sofar'
 
-getDistances :: Cards -> Players -> AdjList -> ([[IntMap Int]], [IntMap Int])
-getDistances cs pl adj =
-  let ps = [listToBB ws | ws <- pl] -- player bitboards
-      f p = any (\x -> x `elem` (cs !! p)) [Apollo, Minotaur] -- those gods ignore opponent's positions
-      obstacles = [if f p then 0 else ps !! (1 - p) | p <- [0, 1]]
+getDistances :: Cards -> Players -> PlayerMap -> AdjList -> ([[IntMap Int]], [IntMap Int])
+getDistances cs pl pm adj =
+  let obstacles = [if (cs !! p) `elem` [Just Apollo, Just Minotaur] then 0 else pm !! (5 - p) | p <- [0, 1]]
       dist' = [[bfs adj (complement (obstacles !! p)) (pl !! p !! w) | w <- [0, 1]] | p <- [0, 1]]
       dist = [if Artemis `elem` (cs !! p) then [Map.map (\x -> (x + 1) `div` 2) (dist' !! p !! w) | w <- [0, 1]] else dist' !! p | p <- [0, 1]]
       bestDist = [Map.fromList [(i, minimum [dist !! p !! w ! i | w <- [0, 1]]) | i <- validIndices] | p <- [0, 1]]
@@ -230,7 +263,7 @@ evaluateDetails
       legalMoves = _
     } =
     let adj = V.fromList [if isValidIndex i then getLegalMoveTo' i lm else 0 | i <- [0 .. (last validIndices)]]
-        (dist, bestDist) = getDistances cs pl adj
+        (dist, bestDist) = getDistances cs pl pm adj
         funcs =
           [ evaluateWorkerProximity pl dist,
             evaluateReachability cs lv bestDist,
@@ -634,16 +667,16 @@ evaluateStepping' _ _ _ _ _ = 0
 --------------------------------------------------------------------------------
 
 evaluateWorkerProximity' :: GameState -> Int -> Score
-evaluateWorkerProximity' GameState {cards = cs, players = pl, levelMap = lm} = evaluateWorkerProximity pl (fst $ getDistances cs pl (createAdjacencyList lm))
+evaluateWorkerProximity' GameState {cards = cs, players = pl, playerMap = pm, levelMap = lm} = evaluateWorkerProximity pl (fst $ getDistances cs pl pm (createAdjacencyList lm))
 
 evaluateReachability' :: GameState -> Int -> Score
-evaluateReachability' GameState {cards = cs, players = pl, levels = lv, levelMap = lm} = evaluateReachability cs lv (snd $ getDistances cs pl (createAdjacencyList lm))
+evaluateReachability' GameState {cards = cs, players = pl, playerMap = pm, levels = lv, levelMap = lm} = evaluateReachability cs lv (snd $ getDistances cs pl pm (createAdjacencyList lm))
 
 evaluateAsymmetry' :: GameState -> Int -> Score
-evaluateAsymmetry' GameState {cards = cs, players = pl, levels = lv, levelMap = lm} = evaluateAsymmetry pl lv lm (snd $ getDistances cs pl (createAdjacencyList lm))
+evaluateAsymmetry' GameState {cards = cs, players = pl, playerMap = pm, levels = lv, levelMap = lm} = evaluateAsymmetry pl lv lm (snd $ getDistances cs pl pm (createAdjacencyList lm))
 
 evaluateStuckBonus' :: GameState -> Int -> Score
 evaluateStuckBonus' GameState {players = pl, levelMap = lm} = evaluateStuckBonus pl (createAdjacencyList lm)
 
 evaluatePrevention' :: GameState -> Int -> Score
-evaluatePrevention' GameState {cards = cs, players = pl, levels = lv, levelMap = lm} = evaluatePrevention pl lv lm (snd $ getDistances cs pl (createAdjacencyList lm))
+evaluatePrevention' GameState {cards = cs, players = pl, playerMap = pm, levels = lv, levelMap = lm} = evaluatePrevention pl lv lm (snd $ getDistances cs pl pm (createAdjacencyList lm))
