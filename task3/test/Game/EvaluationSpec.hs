@@ -117,7 +117,7 @@ spec = do
   describe "Evaluation#getDistancesBB()" $ do
     prop "returns the same result as getDistances()" $ \b ->
       let GameState {cards = cs, players = pl, playerMap = pm, levelMap = lm} = fromBoard b
-       in getDistancesBB cs pl pm lm `shouldBe` getDistances' cs pl pm lm
+       in getDistancesBB cs pm lm `shouldBe` getDistances' cs pl pm lm
 
   describe "Evaluation#evaluate()" $ do
     it "finds out end game" $ do

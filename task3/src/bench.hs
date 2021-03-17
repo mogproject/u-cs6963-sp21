@@ -225,60 +225,60 @@ main :: IO ()
 --     2
 -- =============================================================================
 
--- main = do
---   -- game opening
---   let b1 =
---         B.Board
---           { B.players =
---               ( B.Player {B.card = Artemis, B.tokens = Just ((4, 4), (5, 5))},
---                 B.Player {B.card = Prometheus, B.tokens = Just ((3, 4), (4, 3))}
---               ),
---             B.spaces = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]],
---             B.turn = 0
---           }
---   let s1 = fromBoard b1
+main = do
+  -- game opening
+  let b1 =
+        B.Board
+          { B.players =
+              ( B.Player {B.card = Artemis, B.tokens = Just ((4, 4), (5, 5))},
+                B.Player {B.card = Prometheus, B.tokens = Just ((3, 4), (4, 3))}
+              ),
+            B.spaces = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]],
+            B.turn = 0
+          }
+  let s1 = fromBoard b1
 
---   -- close to end-game
---   let b2 =
---         B.Board
---           { B.players =
---               ( B.Player {B.card = Artemis, B.tokens = Just ((3, 5), (5, 2))},
---                 B.Player {B.card = Prometheus, B.tokens = Just ((3, 2), (4, 4))}
---               ),
---             B.spaces = [[0, 3, 0, 0, 0], [3, 0, 0, 0, 0], [0, 1, 0, 4, 1], [0, 4, 2, 2, 0], [1, 0, 4, 0, 0]],
---             B.turn = 20
---           }
---   let s2 = fromBoard b1
+  -- close to end-game
+  let b2 =
+        B.Board
+          { B.players =
+              ( B.Player {B.card = Artemis, B.tokens = Just ((3, 5), (5, 2))},
+                B.Player {B.card = Prometheus, B.tokens = Just ((3, 2), (4, 4))}
+              ),
+            B.spaces = [[0, 3, 0, 0, 0], [3, 0, 0, 0, 0], [0, 1, 0, 4, 1], [0, 4, 2, 2, 0], [1, 0, 4, 0, 0]],
+            B.turn = 20
+          }
+  let s2 = fromBoard b1
 
---   defaultMain
---     [ bgroup
---         "search opening"
---         [ bench "ɑ-β: depth 1" $ nf (searchAlphaBeta s1) 1,
---           bench "ɑ-β: depth 2" $ nf (searchAlphaBeta s1) 2,
---           bench "ɑ-β: depth 3" $ nf (searchAlphaBeta s1) 3
---         ],
---       bgroup
---         "search end-game"
---         [ bench "ɑ-β: depth 1" $ nf (searchAlphaBeta s2) 1,
---           bench "ɑ-β: depth 2" $ nf (searchAlphaBeta s2) 2,
---           bench "ɑ-β: depth 3" $ nf (searchAlphaBeta s2) 3
---         ]
---     ]
+  defaultMain
+    [ bgroup
+        "search opening"
+        [ bench "ɑ-β: depth 1" $ nf (searchAlphaBeta s1) 1,
+          bench "ɑ-β: depth 2" $ nf (searchAlphaBeta s1) 2 --,
+          -- bench "ɑ-β: depth 3" $ nf (searchAlphaBeta s1) 3
+        ],
+      bgroup
+        "search end-game"
+        [ bench "ɑ-β: depth 1" $ nf (searchAlphaBeta s2) 1,
+          bench "ɑ-β: depth 2" $ nf (searchAlphaBeta s2) 2 --,
+          -- bench "ɑ-β: depth 3" $ nf (searchAlphaBeta s2) 3
+        ]
+    ]
 
 -- =============================================================================
 --     3
 -- =============================================================================
-main = do
-  boards <- generate $ vectorOf 10000 (arbitrary :: Gen B.Board)
-  instances <- evaluate $! map fromBoard boards
+-- main = do
+--   boards <- generate $ vectorOf 10000 (arbitrary :: Gen B.Board)
+--   instances <- evaluate $! map fromBoard boards
 
-  let f1 GameState {cards = cs, players = pl, playerMap = pm, levelMap = lm} = getDistances' cs pl pm lm
-  let f2 GameState {cards = cs, players = pl, playerMap = pm, levelMap = lm} = getDistancesBB cs pl pm lm
+--   let f1 GameState {cards = cs, players = pl, playerMap = pm, levelMap = lm} = getDistances' cs pl pm lm
+--   let f2 GameState {cards = cs, players = pl, playerMap = pm, levelMap = lm} = getDistancesBB cs pl pm lm
 
-  defaultMain
-    [ bgroup
-        "getDistances()"
-        [ bench "getDistances'" $ nf (map f1) instances,
-          bench "getDistancesBB" $ nf (map f2) instances
-        ]
-    ]
+--   defaultMain
+--     [ bgroup
+--         "getDistances()"
+--         [ bench "getDistances'" $ nf (map f1) instances,
+--           bench "getDistancesBB" $ nf (map f2) instances
+--         ]
+--     ]

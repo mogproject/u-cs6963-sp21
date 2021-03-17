@@ -27,7 +27,7 @@ import Data.Bits (Bits (xor), complement, (.&.), (.|.))
 import Data.Card (Card (Apollo, Artemis, Demeter, Hephastus, Minotaur, Pan, Prometheus))
 import Data.IntMap (IntMap, (!))
 import qualified Data.IntMap as Map
-import Data.List (iterate')
+import Data.List (foldl', iterate')
 import Data.List.Split (chunksOf)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -219,11 +219,18 @@ getDistances' cs pl pm lm =
     f :: IntMap Int -> [BitBoard]
     f m = map snd $ Map.toAscList (Map.foldlWithKey' g Map.empty m)
 
-getDistancesBB :: Cards -> Players -> PlayerMap -> LevelMap -> ([[[BitBoard]]], [[BitBoard]])
-getDistancesBB cs _ pm lm =
+getDistancesBB :: Cards -> PlayerMap -> LevelMap -> ([[[BitBoard]]], [[BitBoard]])
+getDistancesBB cs pm lm =
   let dist = [[bfsBB cs p (Just wk) pm lm | wk <- [0, 1]] | p <- [0, 1]]
       best = [bfsBB cs p Nothing pm lm | p <- [0, 1]]
    in (dist, best)
+
+convertDistances :: [BitBoard] -> IntMap Int
+convertDistances bb =
+  foldl' g m0 (zip [0 ..] (take (evalReachTableSize + 1) bb))
+  where
+    m0 = Map.fromList [(i, distInf) | i <- validIndices]
+    g m (v, b) = foldl' (\mm k -> Map.insert k v mm) m (bbToList b)
 
 distInf :: Int
 distInf = 100 -- infinity distance
@@ -286,13 +293,13 @@ evaluateDetails
       turn = t,
       legalMoves = _
     } =
-    let adj = V.fromList [if isValidIndex i then getLegalMoveTo' i lm else 0 | i <- [0 .. (last validIndices)]]
-        (dist, bestDist) = getDistances cs pl pm adj
+    let (dist', bestDist') = getDistancesBB cs pm lm
+        (dist, bestDist) = ([map convertDistances ds | ds <- dist'], map convertDistances bestDist')
         funcs =
           [ evaluateWorkerProximity pl dist,
             evaluateReachability cs lv bestDist,
             evaluateAsymmetry pl lv lm bestDist,
-            evaluateStuckBonus pl adj,
+            evaluateStuckBonus dist',
             evaluatePrevention pl lv lm bestDist,
             evaluateDoubleLizhiBonus cs pl pm lv lm,
             evaluatePrometeusBonus cs pm lm,
@@ -321,8 +328,8 @@ evaluateAsymmetry pl lv lm dist p = sum . map g $ validIndices
        in if diff > 0 then cornerBonus i + getAsymTableValue (lv ! i) diff else 0
 
 -- (4) Stuck Bonus
-evaluateStuckBonus :: Players -> AdjList -> Int -> Score
-evaluateStuckBonus pl adj p = sum [if adj V.! (pl !! (1 - p) !! w) == 0 then evalStuckBonus else 0 | w <- [0, 1]]
+evaluateStuckBonus :: [[[BitBoard]]] -> Int -> Score
+evaluateStuckBonus dist p = sum [if null (dist !! p !! w) then (- evalStuckBonus) else 0 | w <- [0, 1]]
 
 -- (5) Prevension: worker at height 2, opponent cannot approach
 evaluatePrevention :: Players -> Levels -> LevelMap -> [IntMap Int] -> Int -> Score
@@ -700,7 +707,7 @@ evaluateAsymmetry' :: GameState -> Int -> Score
 evaluateAsymmetry' GameState {cards = cs, players = pl, playerMap = pm, levels = lv, levelMap = lm} = evaluateAsymmetry pl lv lm (snd $ getDistances cs pl pm (createAdjacencyList lm))
 
 evaluateStuckBonus' :: GameState -> Int -> Score
-evaluateStuckBonus' GameState {players = pl, levelMap = lm} = evaluateStuckBonus pl (createAdjacencyList lm)
+evaluateStuckBonus' GameState {cards = cs, playerMap = pm, levelMap = lm} = evaluateStuckBonus $ fst (getDistancesBB cs pm lm)
 
 evaluatePrevention' :: GameState -> Int -> Score
 evaluatePrevention' GameState {cards = cs, players = pl, playerMap = pm, levels = lv, levelMap = lm} = evaluatePrevention pl lv lm (snd $ getDistances cs pl pm (createAdjacencyList lm))
