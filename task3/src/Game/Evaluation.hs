@@ -17,7 +17,9 @@ module Game.Evaluation
     hasOneXiangtingMinotaur'',
     hasOneXiangtingArtemis,
     bfsBB,
-    bfsBB',
+    compactDistanceForArtemis,
+    getDistances',
+    getDistancesBB,
   )
 where
 
@@ -25,6 +27,8 @@ import Data.Bits (Bits (xor), complement, (.&.), (.|.))
 import Data.Card (Card (Apollo, Artemis, Demeter, Hephastus, Minotaur, Pan, Prometheus))
 import Data.IntMap (IntMap, (!))
 import qualified Data.IntMap as Map
+import Data.List (iterate')
+import Data.List.Split (chunksOf)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Vector.Unboxed as V
@@ -179,27 +183,47 @@ getLegalMoveToBB_ lm [x0, x1, x2, x3] =
    in [y0, y1, y2, y3]
 getLegalMoveToBB_ _ _ = undefined
 
--- getLegalMvoeToBB :: Index -> PlayerMap -> LevelMap -> BitBoard
--- getLegalMvoeToBB moveFrom pm lm =
-
-bfsBB :: Cards -> Int -> Index -> PlayerMap -> LevelMap -> [BitBoard]
-bfsBB cs p moveFrom pm lm =
+bfsBB :: Cards -> Int -> Maybe Int -> PlayerMap -> LevelMap -> [BitBoard]
+bfsBB cs p wk pm lm =
   let forbidden = if (cs !! p) `elem` [Just Apollo, Just Minotaur] then 0 else pm !! (5 - p)
-   in bfsBB' forbidden moveFrom lm
+      avail = complement forbidden
+      start = pm !! maybe (4 + p) (2 * p +) wk
+   in (if (cs !! p) == Just Artemis then compactDistanceForArtemis else id) $ bfsBB' avail start lm
 
-bfsBB' :: BitBoard -> Int -> LevelMap -> [BitBoard]
-bfsBB' forbidden moveFrom lm =
-  let mf = singletonBB moveFrom
-      avail = mf .|. (complement forbidden)
-      lm' = (map (.&. avail) . take 4) lm
-   in bfsBB'' mf lm'
+bfsBB' :: BitBoard -> BitBoard -> LevelMap -> [BitBoard]
+bfsBB' avail start lm =
+  let lm' = (map (.&. avail) . take 4) lm
+   in bfsBB'' start lm'
 
 bfsBB'' :: BitBoard -> LevelMap -> [BitBoard]
-bfsBB'' mf lm = (takeWhile (/= 0) . map (sum . fst)) $ iterate f (map (.&. mf) lm, mf)
+bfsBB'' mf lm = (takeWhile (/= 0) . map (sum . fst)) $ iterate' f (map (.&. mf) lm, mf)
   where
     f (frontier, visited) =
       let ys = getLegalMoveToBB_ lm frontier
-       in (map (`andNotBB` visited) ys, visited .|. (sum ys))
+       in (map (`andNotBB` visited) ys, visited .|. sum ys)
+
+-- bitboard elements must be distinct
+compactDistanceForArtemis :: [BitBoard] -> [BitBoard]
+compactDistanceForArtemis [] = []
+compactDistanceForArtemis (x : xs) = x : map sum (chunksOf 2 xs)
+
+getDistances' :: Cards -> Players -> PlayerMap -> LevelMap -> ([[[BitBoard]]], [[BitBoard]])
+getDistances' cs pl pm lm =
+  let (dist, best) = getDistances cs pl pm (createAdjacencyList lm)
+   in ([[f d | d <- ds] | ds <- dist], [f d | d <- best])
+  where
+    h k v = case v of
+      Just v' -> Just (v' .|. singletonBB k)
+      Nothing -> Just (singletonBB k)
+    g m k v = if v < distInf then Map.alter (h k) v m else m
+    f :: IntMap Int -> [BitBoard]
+    f m = map snd $ Map.toAscList (Map.foldlWithKey' g Map.empty m)
+
+getDistancesBB :: Cards -> Players -> PlayerMap -> LevelMap -> ([[[BitBoard]]], [[BitBoard]])
+getDistancesBB cs _ pm lm =
+  let dist = [[bfsBB cs p (Just wk) pm lm | wk <- [0, 1]] | p <- [0, 1]]
+      best = [bfsBB cs p Nothing pm lm | p <- [0, 1]]
+   in (dist, best)
 
 distInf :: Int
 distInf = 100 -- infinity distance
@@ -225,7 +249,7 @@ getDistances :: Cards -> Players -> PlayerMap -> AdjList -> ([[IntMap Int]], [In
 getDistances cs pl pm adj =
   let obstacles = [if (cs !! p) `elem` [Just Apollo, Just Minotaur] then 0 else pm !! (5 - p) | p <- [0, 1]]
       dist' = [[bfs adj (complement (obstacles !! p)) (pl !! p !! w) | w <- [0, 1]] | p <- [0, 1]]
-      dist = [if Artemis `elem` (cs !! p) then [Map.map (\x -> (x + 1) `div` 2) (dist' !! p !! w) | w <- [0, 1]] else dist' !! p | p <- [0, 1]]
+      dist = [if Artemis `elem` (cs !! p) then [Map.map (\x -> if x == distInf then x else (x + 1) `div` 2) (dist' !! p !! w) | w <- [0, 1]] else dist' !! p | p <- [0, 1]]
       bestDist = [Map.fromList [(i, minimum [dist !! p !! w ! i | w <- [0, 1]]) | i <- validIndices] | p <- [0, 1]]
    in (dist, bestDist)
 
