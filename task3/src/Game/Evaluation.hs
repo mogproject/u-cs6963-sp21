@@ -103,11 +103,33 @@ evalReachTableForPan =
         [0, 0, 0, 0, 0, 0, 0, 0] -- level 4
       ]
 
+evalReachTableForHephastus :: V.Vector Score
+evalReachTableForHephastus =
+  V.fromList $
+    concat
+      [ -- turn to move (advantageous)
+        [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
+        [300, 200, 40, 30, 20, 15, 12, 0], -- level 1
+        [30000, 20000, 15000, 200, 150, 120, 110, 0], -- level 2
+        [0, 20000, 5000, 2000, 1000, 500, 300, 0], -- level 3 (staying at lv 3 is not advantageous)
+        [0, 0, 0, 0, 0, 0, 0, 0], -- level 4
+
+        -- not turn to move
+        [10, 9, 8, 7, 6, 5, 4, 0], -- level 0
+        [300, 100, 40, 30, 20, 15, 12, 0], -- level 1
+        [30000, 15000, 10000, 200, 150, 120, 110, 0], -- level 2
+        [0, 10000, 5000, 2000, 1000, 500, 300, 0], -- level 3
+        [0, 0, 0, 0, 0, 0, 0, 0] -- level 4
+      ]
+
 evalReachTableSize :: Int
 evalReachTableSize = V.length evalReachTable `div` 10
 
 getReachTableValue :: Maybe Card -> Int -> Int -> Int -> Score
 getReachTableValue (Just Pan) player lev dist = evalReachTableForPan V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist')
+  where
+    dist' = min (evalReachTableSize - 1) dist
+getReachTableValue (Just Hephastus) player lev dist = evalReachTableForHephastus V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist')
   where
     dist' = min (evalReachTableSize - 1) dist
 getReachTableValue _ player lev dist = evalReachTable V.! (player * evalReachTableSize * 5 + lev * evalReachTableSize + dist')
@@ -118,7 +140,7 @@ evalAsymTable :: V.Vector Score
 evalAsymTable =
   V.fromList $
     concat
-      [ [0, 0, 0, 1, 2, 3, 4, 5, 10], -- level 0
+      [ [0, 0, 0, 1, 2, 3, 4, 5, 100], -- level 0
         [0, 0, 0, 10, 20, 30, 40, 50, 9000], -- level 1
         [0, 100, 1000, 2000, 2000, 2000, 2000, 2000, 10000], -- level 2
         [0, 0, 0, 0, 0, 0, 0, 0, 0], -- level 3 (not very important as this leads to endgame)
@@ -677,6 +699,7 @@ evaluateStepping' c 2 mask lm dist
     lv1nbr = mask .&. (lm !! 1)
     oppUnreachable bb = any (\i -> dist ! i > 1) (bbToList bb)
 evaluateStepping' c 1 mask lm dist
+  | c == Just Hephastus && lv2nbr /= 0 && oppUnreachable lv2nbr = evalStepping22 -- worth more than 1-2
   | lv2nbr /= 0 && oppUnreachable lv2nbr = evalStepping12
   | lv1nbr /= 0 && oppUnreachable lv1nbr = evalStepping11
   | c == Just Prometheus && lv0nbr /= 0 && oppUnreachable lv0nbr = evalStepping11
@@ -685,7 +708,8 @@ evaluateStepping' c 1 mask lm dist
     lv1nbr = mask .&. (lm !! 1)
     lv0nbr = mask .&. (lm !! 0)
     oppUnreachable bb = any (\i -> dist ! i > 1) (bbToList bb)
-evaluateStepping' _ 0 mask lm dist
+evaluateStepping' c 0 mask lm dist
+  | c == Just Hephastus && lv1nbr /= 0 && oppUnreachable lv1nbr = evalStepping12
   | lv1nbr /= 0 && oppUnreachable lv1nbr = evalStepping01
   | otherwise = 0
   where

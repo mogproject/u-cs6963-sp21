@@ -389,3 +389,32 @@ spec = do
 
       mv1 <- findMoveWithTimeout 30000000 Nothing s1
       getBuildAt mv1 `shouldNotBe` [(posToIndex (1, 3), 1, 2)]
+
+    it "prevents opponent win" $ do
+      -- {"players":[{"card":"Atlas","tokens":[[1,2],[2,2]]},{"card":"Hephastus","tokens":[[2,3],[4,2]]}],"spaces":[[1,0,0,0,0],[0,0,0,0,0],[0,0,2,0,0],[0,0,0,0,0],[0,0,0,0,0]],"style":{"desc":false,"players":["yo-2021-03-16","play-rate"]},"turn":2}
+      -- {"players":[{"card":"Atlas","tokens":[[1,2],[3,2]]},{"card":"Hephastus","tokens":[[3,4],[4,2]]}],"spaces":[[1,0,0,0,0],[0,0,0,0,0],[0,0,2,0,0],[0,0,4,1,0],[0,0,0,0,0]],"style":{"desc":false,"players":["yo-2021-03-16","play-rate"]},"turn":4}
+
+      let b1 =
+            B.Board
+              { B.players =
+                  -- ( B.Player {B.card = Atlas, B.tokens = Just ((1, 2), (3, 2))},
+                  ( B.Player {B.card = Atlas, B.tokens = Just ((1, 2), (2, 2))},
+                    B.Player {B.card = Hephastus, B.tokens = Just ((2, 3), (4, 2))}
+                    -- B.Player {B.card = Hephastus, B.tokens = Just ((3, 4), (4, 2))}
+                  ),
+                B.spaces = [[1,0,0,0,0],[0,0,0,0,0],[0,0,2,0,0],[0,0,0,0,0],[0,0,0,0,0]],
+                -- B.spaces = [[1,0,0,0,0],[0,0,0,0,0],[0,0,2,0,0],[0,0,4,1,0],[0,0,0,0,0]],
+                B.turn = 4
+              }
+      let s1 = fromBoard b1
+      -- printAllMoves s1
+
+      -- mv <- findMoveWithTimeout 5000000 Nothing s1
+      -- print $ showMove mv
+      -- getBuildAt mv `shouldNotBe` [(posToIndex (4, 3), 0, 4)]
+
+      mv1 <- findMoveWithTimeout 30000000 Nothing s1
+      -- print $ showMove mv1
+      -- getMoveTo mv1 `shouldBe` posToIndex (2, 3)
+
+      getBuildAt mv1 `shouldNotBe` [(posToIndex (4, 3), 0, 4)]
