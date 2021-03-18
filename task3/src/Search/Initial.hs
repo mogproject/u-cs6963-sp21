@@ -6,7 +6,7 @@ module Search.Initial
 where
 
 import Data.Board (Pos, Workers)
-import Data.Card (Card)
+import Data.Card ( Card(Prometheus, Demeter, Hephastus) )
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -28,6 +28,10 @@ findStartingPlayer1 0 gen _ =
       (w2, _, _) = retrieveElement r1 ys
    in (w1, w2)
 -- Strategy 1: fixed position + randomized
+findStartingPlayer1 1 gen (Just (_, c))
+  | c `elem` [Demeter, Hephastus, Prometheus] =  -- vs. double builders
+    let (n, _) = randomR (0, 3) gen
+     in [((3, 3), (3, 2)), ((3, 3), (2, 3)), ((3, 3), (3, 4)), ((3, 3), (4, 3))] !! n
 findStartingPlayer1 1 gen _ =
   let (n, _) = randomR (0, 3) gen
    in [((4, 4), (5, 5)), ((2, 2), (1, 1)), ((2, 4), (1, 5)), ((4, 2), (5, 1))] !! n
