@@ -61,7 +61,7 @@ usage p =
     [ "Usage: " ++ p ++ " [--seed <seed>] [--timeout <timeout>] [--depth <depth>]",
       "",
       "  seed    : seed of the pseudo random number generator (default:None)",
-      "  timeout : timeout for each move in seconds (default:10)",
+      "  timeout : timeout for each move in seconds (default:30)",
       "  depth   : maximum search depth (default:None)"
     ]
 
