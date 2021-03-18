@@ -140,7 +140,7 @@ evalAsymTable :: V.Vector Score
 evalAsymTable =
   V.fromList $
     concat
-      [ [0, 0, 0, 1, 2, 3, 4, 5, 100], -- level 0
+      [ [0, 0, 0, 1, 2, 3, 4, 5, 10], -- level 0
         [0, 0, 0, 10, 20, 30, 40, 50, 9000], -- level 1
         [0, 100, 1000, 2000, 2000, 2000, 2000, 2000, 10000], -- level 2
         [0, 0, 0, 0, 0, 0, 0, 0, 0], -- level 3 (not very important as this leads to endgame)
