@@ -1,0 +1,29 @@
+name: cluster-editing
+version: 0.1.0
+github: "mogproject/cluster-editing"
+license: Apache-2.0
+author: "mogproject"
+copyright: "2021 mogproject"
+
+description: Please see the README on GitHub at <https://github.com/mogproject/cluster-editing#readme>
+
+dependencies:
+  - base >= 4.7 && < 5
+  - containers
+  - random
+  - vector
+  - heap
+
+library:
+  source-dirs: src
+
+executables:
+  exact:
+    main: Main.hs
+    source-dirs: app
+#    ghc-options:
+#      - -threaded
+#      - -rtsopts
+#      - -with-rtsopts=-N
+    dependencies:
+      - cluster-editing

@@ -1,0 +1,52 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.3.
+--
+-- see: https://github.com/sol/hpack
+
+name:           cluster-editing
+version:        0.1.0
+description:    Please see the README on GitHub at <https://github.com/mogproject/cluster-editing#readme>
+homepage:       https://github.com/mogproject/cluster-editing#readme
+bug-reports:    https://github.com/mogproject/cluster-editing/issues
+author:         mogproject
+maintainer:     mogproject
+copyright:      2021 mogproject
+license:        Apache-2.0
+license-file:   LICENSE
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/mogproject/cluster-editing
+
+library
+  exposed-modules:
+      Branch
+      Data.Graph
+  other-modules:
+      Paths_cluster_editing
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , heap
+    , random
+    , vector
+  default-language: Haskell2010
+
+executable exact
+  main-is: Main.hs
+  other-modules:
+      Paths_cluster_editing
+  hs-source-dirs:
+      app
+  build-depends:
+      base >=4.7 && <5
+    , cluster-editing
+    , containers
+    , heap
+    , random
+    , vector
+  default-language: Haskell2010
